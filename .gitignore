@@ -1,0 +1,14 @@
+# Ne pas partager le fichier sparkapi.ini sur GitHub
+# Ce fichier est censé contenir des informations sensibles
+#   comme l'access_token et des core_id
+config.ini
+cachefile.pkl
+logfile.log
+
+lcdmtrx
+test
+pypcl
+
+# Ignorer les fichier python compilé
+*.pyc
+
