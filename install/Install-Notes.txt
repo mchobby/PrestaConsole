@@ -5,9 +5,6 @@ Presta Console - Installation Notes
 * Pip installer
 * GIT
 
--- Install Pip --
-sudo apt-get install python-pip
-
 === Needed Python Libs ===
 Use pip to install the following libs
   * httplib2
@@ -23,7 +20,9 @@ Use pip to install the following libs
              Can be made available in the source code as "pypcl" subfolder
 			   via a symbolic link to PythonPcl/pypcl
 
--- Libs installation --
+=== Installation Instructions ===
+
+sudo apt-get install python-pip
 
 sudo pip install httplib2
 
@@ -31,7 +30,11 @@ sudo pip install pyserial
 
 sudo pip install prestapyt
 
-cd PrestaConsole 
-git clone https://github.com/mchobby/lcdmtrx
+git clone https://github.com/mchobby/PrestaConsole.git 
+git clone https://github.com/mchobby/lcdmtrx.git
+git clone https://github.com/mchobby/PythonPcl.git
 
+cd PrestaConsole
+ln -s ./../lcdmtrx lcdmtrx
+ln -s ./../PythonPcl/pypcl pypcl
 
