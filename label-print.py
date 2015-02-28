@@ -44,6 +44,9 @@ logging.basicConfig( filename=config.logfile, level=logging.DEBUG,
 	format='%(asctime)s - [%(levelname)s] %(message)s',
 	datefmt='%d/%m/%y %H:%M:%S.%f' )
 
+# LABEL Size is stored into the article reference of the "PARAMS" supplier.
+ID_SUPPLIER_PARAMS = None
+
 def list_products( cachedphelper, key ):
 	""" Search for a product base on its partial reference code + list them """
 	assert isinstance( key, str ), 'Key must be a string'
@@ -55,12 +58,55 @@ def list_products( cachedphelper, key ):
 	for item in result:
 		print( '%4i : %s - %s' % (item.id,item.reference.ljust(20),item.name) )
 		
+def get_product_params_dic( cachedpHelper,id_product ):
+	""" Locate the product parameter stored in the PARAMS supplier
+	    reference on the product. The reference is coded as follow
+	    param1:value1,param2:value2 """
+	
+	# If this special PARAMS supplier is not yet identified then
+	#   not possible to locate the special product parameter
+	#   stored there 
+	if ID_SUPPLIER_PARAMS == None:
+		return {}
+	
+	reference = ''
+	try:	
+		reference = cachedpHelper.product_suppliers.reference_for( id_product, ID_SUPPLIER_PARAMS )
+		# print( 'reference: %s' % reference )
+		if len(reference )==0:
+			return {}
+		
+		result = {}
+		lst = reference.split(',')
+		for item in lst:
+			vals = item.split(':')
+			if len( vals )!= 2:
+				raise Exception( 'a parameter must have 2 parts!' )
+			result[vals[0]] = vals[1]
+		
+		return result
+		
+	except Exception as e:
+		print( 'Error while processing param %s with message %s ' % (reference,str(e)) )	
+		return {}
+		
+		
 def print_for_product( cachedphelper, id ):
-	""" print the labels for a given ID product """
+	""" GO TO print the labels for a given ID product """
 	item = cachedphelper.products.product_from_id( id )
 	if item == None:
 		print( 'Oups, %i is not a valid product' % id )
 		return
+	
+	# Detection de la largeur de l'étiquette dans LS:S (label size=small)	
+	params = get_product_params_dic( cachedphelper, id )
+	label_size = 'large'
+	if 'LS' in params:
+		if params['LS']=='S':
+			label_size = 'small'
+		else:
+			label_size = 'large'
+	
 
 	if len( item.ean13 )>0 :
 		product_ean = item.ean13
@@ -69,6 +115,7 @@ def print_for_product( cachedphelper, id ):
 		product_ean = '32321%07i' % id # prefix 3232 + product 1 + id_product
 		product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 		print( '%i : %s - %s  *generated*' % (id,item.reference,product_ean) )
+	print( 'Label format: %s' % label_size )
 		
 	value = raw_input( 'How many label for %s: ' % item.reference )
 	if len(value)==0:
@@ -92,7 +139,12 @@ def print_for_product( cachedphelper, id ):
 	product_id = id
 	product_ref = item.reference
 	
-	print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
+	if label_size == 'small':
+		# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
+		print_product_label( product_id, product_ref, product_ean, int(value) )
+	else:
+		# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
+		print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
 	return
 	 
 def print_product_label( product_id, product_ref, product_ean, qty ):
@@ -202,6 +254,16 @@ def main():
 			print( '%s' %prestaProgressEvent.msg )
 		else:
 			print( '%i/%i - %s' % ( prestaProgressEvent.current_step, prestaProgressEvent.max_step, prestaProgressEvent.msg ) )
+
+	def initialize_globals():
+		""" Initialize the global var @ startup or @ reload """
+		global ID_SUPPLIER_PARAMS
+		_item = cachedphelper.suppliers.supplier_from_name( "PARAMS" )
+		#for _item in cachedphelper.suppliers:
+		#	print( '%i - %s' % (_item.id,_item.name) )
+		if _item != None:
+			ID_SUPPLIER_PARAMS = _item.id
+			print( 'Catched PARAMS supplier :-). ID: %i' % ID_SUPPLIER_PARAMS )	
     
     # A CachedPrestaHelper is a PrestaHelper with cache capabilities	
 	cachedphelper = CachedPrestaHelper( config.presta_api_url, config.presta_api_key, debug = False, progressCallback = progressHandler )
@@ -220,8 +282,11 @@ def main():
 	print( '#suppliers = %i' % len( cachedphelper.suppliers ) )
 	print( '#categories = %i' % len( cachedphelper.categories ) )
 	print( '#stock availables = %i' % len( cachedphelper.stock_availables ) )
+	print( '#product suppliers available = %i' % len( cachedphelper.product_suppliers ) )
 	print( '******************************************************************' )
 	print( '' )		
+	initialize_globals()
+
 	#print('mise à jour des qty' )
 	#cachedphelper.stock_availables.update_quantities()
 	#print( 'Voila, c est fait' )
@@ -241,6 +306,7 @@ def main():
 		elif value == '+r':
 			print( 'Contacting WebShop and reloading...' )
 			cachedphelper.load_from_webshop()
+			initialize_globals() # reinit global variables	
 		elif value == '+s':
 			print( 'Saving cache...' )
 			cachedphelper.save_cache_file()

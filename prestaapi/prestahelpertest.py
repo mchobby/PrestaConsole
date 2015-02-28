@@ -278,7 +278,7 @@ class CachedPrestaHelperTest( object ):
 		print( '#suppliers = %i' % len( self._pHelper.suppliers ) )
 		print( '#categories = %i' % len( self._pHelper.categories ) )
 		print( '#stock availables = %i' % len( self._pHelper.stock_availables ) )
-		print( '#product suppliers available = %i' % len( self._pHelper.stock_availables ) )
+		print( '#product suppliers available = %i' % len( self._pHelper.product_suppliers ) )
 		
 		print('mise à jour des qty' )
 		self._pHelper.stock_availables.update_quantities()

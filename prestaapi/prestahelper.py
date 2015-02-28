@@ -461,6 +461,11 @@ class CachedPrestaHelper( PrestaHelper ):
 		return self.__product_list
 		
 	@property 
+	def product_suppliers( self ):
+		""" Return the product suppliers """ 
+		return self.__product_supplier_list
+		
+	@property 
 	def suppliers( self ):
 		""" Return the supplier list """
 		return self.__supplier_list
@@ -766,6 +771,14 @@ class SupplierList( BaseDataList ):
 		if _supplier_data == None:
 			return ''
 		return _supplier_data.name
+		
+	def supplier_from_name( self, name ):
+		""" Locate the supplier object for a given supplier name """
+		for item in self:
+			if item.name.upper() == name.upper():
+				return item
+				
+		return None # Not find!
 
 class ProductSupplierData( BaseData ):
 	""" Contains the ProductSupplier description data """
