@@ -35,7 +35,8 @@ import sys
 
 from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
-PRINTER_QUEUE_NAME = 'zebra-raw'
+PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
+PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
 PRINTER_ENCODING = 'cp850'
 
 config = Config()
@@ -91,7 +92,7 @@ def print_for_product( cachedphelper, id ):
 	product_id = id
 	product_ref = item.reference
 	
-	print_product_label( product_id, product_ref, product_ean, int(value) )	 
+	print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
 	return
 	 
 def print_product_label( product_id, product_ref, product_ean, qty ):
@@ -100,7 +101,7 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_QUEUE_NAME )
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 	
 	# Start a Print format
@@ -119,6 +120,48 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 	d.field( origin=(98,185), font=d.font('C'), data=u'MC Hobby sprl' )
 	
 	d.field( origin=(265,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+	
+def print_product_label_large( product_id, product_ref, product_ean, qty ):
+	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Write a BarCode field
+	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode( product_ref) ) # use font E as default
+	
+	d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
+	d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+		
+	d.field( origin=(225,150), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	d.field( origin=(255,175), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	
+
 	# End Print format
 	d.format_end()
 
