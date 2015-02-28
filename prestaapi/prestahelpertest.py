@@ -28,6 +28,7 @@ class PrestaHelperTest( object ):
 		#self.test_products() # Prefer using the CachedPrestaHelper class
 		#self.test_bad_stock_config_ids()
 		#self.test_suppliers()
+		self.test_product_suppliers()
 		#self.test_categories()
 		#self.test_stock_available()
 	
@@ -208,6 +209,24 @@ class PrestaHelperTest( object ):
 		print( 'Who is supplier ID = 10' )
 		print( '  +--> %s' % (suppliers.name_from_id(10)) )
 
+	def test_product_suppliers( self ):
+		print( '--- PRODUCT SUPPLIERS ---' )
+		product_suppliers = self._pHelper.get_product_suppliers()
+		for item in product_suppliers:
+			print( 'ID Product: %i --> ID supplier: %i --> ref: %s' % (item.id_product, item.id_supplier, item.reference ) )
+		
+		print( 'Suppliers for ID Product 17' )	
+		suppliers = product_suppliers.suppliers_for_id_product( 17 )
+		for info in suppliers:
+			print( 'id supplier: %i  --> ref: %s' % (info.id_supplier, info.reference) )
+			
+		print( 'Reference for ID_product 17 and ID_supplier 2' )
+		print ( product_suppliers.reference_for( id_product = 17, id_supplier = 2 ) )
+
+		print( 'first Reference found for ID_product 17' )
+		print ( product_suppliers.reference_for( id_product = 17, id_supplier = None ) )
+		
+			
 	def test_categories( self ):
 		print( '--- CATEGORIES ---' )
 		categories = self._pHelper.get_categories()
@@ -259,6 +278,7 @@ class CachedPrestaHelperTest( object ):
 		print( '#suppliers = %i' % len( self._pHelper.suppliers ) )
 		print( '#categories = %i' % len( self._pHelper.categories ) )
 		print( '#stock availables = %i' % len( self._pHelper.stock_availables ) )
+		print( '#product suppliers available = %i' % len( self._pHelper.stock_availables ) )
 		
 		print('mise à jour des qty' )
 		self._pHelper.stock_availables.update_quantities()

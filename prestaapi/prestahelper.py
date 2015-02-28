@@ -179,6 +179,16 @@ class PrestaHelper(object):
 		
 		return _result 
 		
+	def get_product_suppliers( self ):
+		""" retreive the list of all the supplier for all the products """
+		logging.debug('read product suppliers')
+		el = self.__prestashop.search( 'product_suppliers', options = {'display': '[id,id_product,id_supplier,product_supplier_reference]'} )
+		
+		_result = ProductSupplierList( self )
+		_result.load_from_xml( el )
+		
+		return _result
+		
 	def get_order_states( self ):
 		""" Retreive the list of Order States (OrderStateDate) from prestashop """
 		logging.debug( 'read order states' )
@@ -318,7 +328,7 @@ class PrestaProgressEvent( object ):
 		 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 2
+	CACHE_FILE_VERSION = 3
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 	
@@ -328,6 +338,7 @@ class CachedPrestaHelper( PrestaHelper ):
 	__supplier_list = None
 	__category_list = None
 	__stock_available_list = None
+	__product_supplier_list = None
 
 	def __init__( self, presta_api_url, presta_api_key, debug = __debug__, progressCallback = None  ):
 		""" constructor with connection parameter to PrestaShop API. 
@@ -349,7 +360,7 @@ class CachedPrestaHelper( PrestaHelper ):
 	def load_from_webshop( self ):
 		""" Load the cache with data cominf from the WebShop """
 		logging.info( 'Init cache from WebShop' )
-		__MAX_STEP = 6
+		__MAX_STEP = 7
 		self.fireProgress( 1, __MAX_STEP, 'Caching Carriers...' )
 		self.__carrier_list = self.get_carriers()
 		self.fireProgress( 2, __MAX_STEP, 'Caching Order states...' )
@@ -362,6 +373,8 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__category_list = self.get_categories()
 		self.fireProgress( 6, __MAX_STEP, 'Caching Stock Availables...' )
 		self.__stock_available_list = self.get_stockavailables()
+		self.fireProgress( 7, __MAX_STEP, 'Caching Product Suppliers...' )
+		self.__product_supplier_list = self.get_product_suppliers()
 		
 		# Closing progress
 		self.fireProgress( -1, __MAX_STEP, 'Done' ) # -1 for hidding
@@ -396,6 +409,8 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__category_list.unpickle_data( fh )
 			self.__stock_available_list = StockAvailableList( self )
 			self.__stock_available_list.unpickle_data( fh )
+			self.__product_supplier_list = ProductSupplierList( self )
+			self.__product_supplier_list.unpickle_data( fh )
 			return True
 		except StandardError, error:
 			 logging.error( 'Reload cache from %s failed due to exception' % self.CACHE_FILE_NAME )
@@ -418,6 +433,7 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__supplier_list.pickle_data( fh )
 			self.__category_list.pickle_data( fh )
 			self.__stock_available_list.pickle_data( fh )
+			self.__product_supplier_list.pickle_data( fh )
 		finally:
 			fh.close()
 		
@@ -751,6 +767,83 @@ class SupplierList( BaseDataList ):
 			return ''
 		return _supplier_data.name
 
+class ProductSupplierData( BaseData ):
+	""" Contains the ProductSupplier description data """
+	__slots__ = ["id", "id_product", "id_supplier", "reference" ]
+	
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the SupplierList """
+		pass
+		
+	def __getstate__(self):
+		""" return state of the object for pickeling """
+		return { "id" : self.id, "id_product" : self.id_product, "id_supplier": self.id_supplier, "reference" : self.reference }
+
+	def __setstate__(self, dic):
+		""" set the state of the object based on dictionary """
+		self.id          = dic['id']
+		self.id_product  = dic['id_product']
+		self.id_supplier = dic['id_supplier']
+		self.reference   = dic['reference'] 
+		
+class ProductSupplierList( BaseDataList ):
+	
+	def load_from_xml( self, node ):
+		""" Load the product_supplier list with data comming from prestashop search.
+			Must contains nodes: id, id_product, id_supplier, product_supplier_reference """
+		items = etree_to_dict( node )
+		items = items['prestashop']['product_suppliers']['product_supplier']
+		for item in items:
+			_data = ProductSupplierData( self.helper )
+			_data.id      = int( item['id'] )
+			_data.id_product = int( item['id_product']['#text'] )
+			_data.id_supplier = int( item['id_supplier']['#text'] )
+			_data.reference   = item['product_supplier_reference']
+			self.append( _data )
+
+	def pickle_data( self, fh ):
+		""" organize the pickeling of data 
+		
+		Parameters:
+			fh - file handler to dump the data
+		"""
+		BaseDataList.pickle_data( self, fh )
+		
+	def unpickle_data( self, fh ):
+		""" unpickeling the data
+		
+		Parameter:
+			fh - file handler to read the data
+		"""
+		BaseDataList.unpickle_data( self, fh )
+		
+	def suppliers_for_id_product( self, id_product ):
+		""" find all the records for a given product """
+		result = []
+		
+		for item in self:
+			if item.id_product == id_product:
+				result.append( item )
+		
+		return result
+		
+	def reference_for( self, id_product, id_supplier ):
+		""" Look for the reference on a specific supplier. if id_supplier 
+		is None then return the first reference found """
+		result = self.suppliers_for_id_product( id_product )
+		if len( result )==0:
+			return ''
+			
+		# No supplier mentionned --> return the first reference
+		if id_supplier == None:
+			return result[0].reference
+
+		for item in result:
+			if item.id_supplier == id_supplier:
+				return item.reference
+				
+		return '' # No reference found for the specified ID_Supplier
+	
 class CategoryData( BaseData ):
 	""" Contains the Carriers data """
 	__slots__ = ["id", "active", "level_depth", "is_root_category" ,"name" ]
@@ -1168,7 +1261,6 @@ class BaseProductList( BaseDataList ):
 			# Damned PrestaShop accept EAN12 instead of ean13!?!?
 			if len(_data.ean13) == 12:
 				_data.ean13 = calculate_ean13( _data.ean13 ) 
-			print( _data.ean13 )
 
 	def pickle_data( self, fh ):
 		""" organize the pickeling of data 
