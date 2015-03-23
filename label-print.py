@@ -175,9 +175,34 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 	if qty > 1:
 		d.print_quantity( qty )
 
+	# Label is printed with 2 lines of 10 characters
+	l1 = product_ref[:10] 
+	l2 = product_ref[10:]
+	
+	# Write product name
+	#   we will try to offer a human redeable text (2x10 chars) on the  
+	#   label properly cut the text around ' ', '-'
+	iPos = max( l1.rfind( ' ' ), l1.rfind( '-' ) )
+	if iPos == -1 or iPos == 9 or len( product_ref ) <= 10: 
+		# The text too short or not appropriate to cute it.
+        # Just cut it without care.
+		l1 = product_ref.ljust(20)[:10] 
+		l2 = product_ref.ljust(20)[10:]
+	else:
+		iShouldMove = 10 - (iPos+1)
+		if len( l2 )+ iShouldMove <= 10: # if second line would not exceed max len ?
+			# We go for nicely cutting it!
+			l2 = l1[iPos+1:] + l2
+			l1 = l1[:iPos+1] 
+		else:
+			# Keep the cut without care
+			l1 = product_ref.ljust(20)[:10] 
+			l2 = product_ref.ljust(20)[10:]
+			
+	
+	d.field( origin=(120,11), font=d.font('E'), data= unicode( l1 ) )
+	d.field( origin=(120,42), font=d.font('E'), data= unicode( l2 ) )
 	# Write a BarCode field
-	d.field( origin=(120,11), font=d.font('E'), data= unicode( product_ref.ljust(20)[:10] ) )
-	d.field( origin=(120,42), font=d.font('E'), data= unicode( product_ref.ljust(20)[10:] ) )
 	d.ean13( origin=(130,80), ean=unicode(product_ean), height_dots = 50 )
 	
 	d.field( origin=(130,160), font=d.font('C'), data=u'shop.mchobby.be' )
