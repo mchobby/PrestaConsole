@@ -115,37 +115,49 @@ def print_for_product( cachedphelper, id ):
 		product_ean = '32321%07i' % id # prefix 3232 + product 1 + id_product
 		product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 		print( '%i : %s - %s  *generated*' % (id,item.reference,product_ean) )
-	print( 'Label format: %s' % label_size )
 		
-	value = raw_input( 'How many label for %s: ' % item.reference )
-	if len(value)==0:
-		value = '1'
-	if value=='0':
-		return
-	if not value.isdigit():
-		print( '%s is not a numeric value' % value )
-		return
-	
-	if int(value) > 25:
-		value2 = raw_input( 'Quantity > 25! Please confirm: ' )
-		if not value2.isdigit():
-			print( '%s is not a numeric value, ABORT!' % value2 )
-			return
-		elif int(value2) != int(value):
-			print( 'inconsistant quantities %s & %s' % (value, value2) )
+	while True:
+		print( '-'*20 )
+		print( '+ : switch label size ' )
+		print( '+q: quit this print      | 0: quit this print ' )
+		print( '' )
+		print( 'Label format: %s' % label_size.upper() )
+		value = raw_input( 'How many label for %s: ' % item.reference )
+		if len(value)==0:
+			value = '1'
+		if value=='0':
 			return
 			
-	# collect the needed data to print the label
-	product_id = id
-	product_ref = item.reference
-	
-	if label_size == 'small':
-		# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
-		print_product_label( product_id, product_ref, product_ean, int(value) )
-	else:
-		# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
-		print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
-	return
+		if value=='+': # change label size
+			label_size = 'large' if label_size == 'small' else 'small'
+			continue 
+		if value=='+q': #user abord
+			return 
+			
+		if not value.isdigit():
+			print( '%s is not a numeric value' % value )
+			return
+		
+		if int(value) > 25:
+			value2 = raw_input( 'Quantity > 25! Please confirm: ' )
+			if not value2.isdigit():
+				print( '%s is not a numeric value, ABORT!' % value2 )
+				return
+			elif int(value2) != int(value):
+				print( 'inconsistant quantities %s & %s' % (value, value2) )
+				return
+				
+		# collect the needed data to print the label
+		product_id = id
+		product_ref = item.reference
+		
+		if label_size == 'small':
+			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
+			print_product_label( product_id, product_ref, product_ean, int(value) )
+		else:
+			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
+			print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
+		return
 	 
 def print_product_label( product_id, product_ref, product_ean, qty ):
 	""" Print the Labels on the Zebra LP 2824 on 1.25" x 1" labels """
@@ -230,6 +242,91 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	
 	del( medium )
 
+def print_ondemand_label_large( label_title, label_lines, qty ):
+	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
+	
+	label_title: title on the label, first line in extra bold
+	label_lines: list of unicode to be printed (up to 5 lines)"""
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Write a BarCode field
+	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode(label_title) ) # use font E as default
+	top = 62
+	for line in label_lines:
+		d.field( origin=(175, top), font=d.font('C'), data=line )
+		top = top + 25
+	
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
+def print_ondemand_label_short( label_title, label_lines, qty ):
+	""" Print the Labels on the LP2824 on small labels 
+	
+	label_title: title on the label, lines 1 & two in extra bold
+	label_lines: list of unicode to be printed (up to 5 lines)"""
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Write a BarCode field
+	d.field( origin=(120,11), font=d.font('E'), data= unicode( label_title.ljust(20)[:10] ) )
+	d.field( origin=(120,42), font=d.font('E'), data= unicode( label_title.ljust(20)[10:] ) )
+	top = 75
+	for line in label_lines:
+		d.field( origin=(98, top), font=d.font('C'), data=line )
+		top = top + 25
+	
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
 def ean12_to_ean13():
 	""" calculate the checksum of an ean12 to create an ean13 """
 	value = raw_input( 'Ean12: ' )
@@ -248,6 +345,84 @@ def product_id_to_ean13():
 	product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 	print( 'Ean13: %s' % product_ean )
 		
+def ondemand_label_large():
+	""" Ask the user for the data to print an OnDemand label for large format """
+	lines = [] 
+	title = 'My onDemand label test!' # Title cannot be unicode
+	 
+	title = raw_input( 'Title (sans accent) or +q: ' )
+	if title == '+q': # user abord
+		return
+	
+	print( 'Key in the lines (+q to quit, empty to proceed)' )
+	iLine = 0
+	while True:
+		iLine += 1
+		aLine = raw_input( '%i: ' % iLine )
+		if len( aLine ) == 0:
+			break
+		if aLine == '+q': # User abord
+			return  
+		
+		# Decode the line otherwise the unicode quest an ascii string
+		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		if iLine == 6:
+			break
+	
+	value = raw_input( 'How many labels ?' )
+	if value == 0:
+		return
+	if value == '+q':
+		return
+	if value == '': # By default, 1 label
+		value = 1
+		
+	qty = int( value )
+	if qty > 25:
+		print( 'Max 25 labels allowed! Value sharped to 25.' )
+		qty = 25
+		
+	print_ondemand_label_large( title, lines, qty )
+
+def ondemand_label_short():
+	""" Ask the user for the data to print an OnDemand label for short format """
+	lines = [] 
+	title = 'My onDemand label test!' # Title cannot be unicode
+	 
+	title = raw_input( 'Title (sans accent) or +q: ' )
+	if title == '+q': # user abord
+		return
+	
+	print( 'Key in the lines (+q to quit, empty to proceed)' )
+	iLine = 0
+	while True:
+		iLine += 1
+		aLine = raw_input( '%i: ' % iLine )
+		if len( aLine ) == 0:
+			break
+		if aLine == '+q': # User abord
+			return  
+		
+		# Decode the line otherwise the unicode quest an ascii string
+		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		if iLine == 6:
+			break
+	
+	value = raw_input( 'How many labels ?' )
+	if value == 0:
+		return
+	if value == '+q':
+		return
+	if value == '': # By default, 1 label
+		value = 1
+		
+	qty = int( value )
+	if qty > 25:
+		print( 'Max 25 labels allowed! Value sharped to 25.' )
+		qty = 25
+		
+	print_ondemand_label_short( title, lines, qty )
+	
 def main():
 	def progressHandler( prestaProgressEvent ):
 		if prestaProgressEvent.is_finished:
@@ -293,11 +468,14 @@ def main():
 	
 	value = ''
 	while value != '+q':
-		print( '' )
-		print( '  +r : reload cache         | +s          : save cache' )
-		print( '  +12: ean12 to ean13       | +e          : create ean13' )
-		print( '  id : id product to print  | partial_code: to search' )
+		print( '='*40 )
+		print( '  +r : reload cache           | +s          : save cache' )
+		print( '  +12: ean12 to ean13         | +e          : create ean13' )
+		print( '  id : id product to print    | partial_code: to search' )
+		print( '  +ol: On demand label (Large)| +al         : address label' )
+		print( '  +os: On demand label (Short)| +openl      : open for... label' )
 		print( '  +q : quit ' )
+		print( '='*40 )
 		print( '' )
 		value = raw_input( 'What to do: ' )
 		
@@ -314,6 +492,48 @@ def main():
 			ean12_to_ean13()
 		elif value == '+e':
 			product_id_to_ean13()
+		elif value == '+ol': #On_demand Large label
+			ondemand_label_large()
+		elif value == '+os': #On_demand Short label
+			ondemand_label_short()
+		elif value == '+al': # adress Label
+			value = raw_input( 'How many labels or +q: ' )
+			if value == '+q' or value=='0':
+				continue
+			if value == '':
+				value = '1'
+			qty = int( value )
+			if qty > 25:
+				qty = 25
+				print( 'Max 25 labels allowed! Value sharped to 25.' )
+				
+			print_ondemand_label_large( 'MC Hobby SPRL',
+				[ unicode( config.company_address[0]  ),
+				unicode( config.company_address[1]  ),
+				unicode( config.company_address[2]  ),
+				unicode( u'TVA/VAT: %s' % config.company_vat   ), 
+				unicode( u'Phone  : %s' % config.company_phone ),
+				unicode( u'Web    : %s' % config.company_url   )
+				], qty )
+
+		elif value == '+openl': 
+			value = raw_input( 'How many labels or +q: ' )
+			if value == '+q' or value=='0':
+				continue
+			if value == '':
+				value = '1'
+			qty = int( value )
+			if qty > 25:
+				qty = 25
+				print( 'Max 25 labels allowed! Value sharped to 25.' )
+
+			print_ondemand_label_large( 'Votre produit ouvert pour:',
+				[u'[  ] ajout de matériel',
+				u'[  ] contrôle qualité',
+				u'',
+				u'',
+				u'MC Hobby SPRL' ], qty )
+				
 		elif value.isdigit():
 			print_for_product( cachedphelper, int(value) )
 		else:
