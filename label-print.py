@@ -308,6 +308,46 @@ def print_ondemand_label_large( label_title, label_lines, qty ):
 		               
 	
 	del( medium )
+	
+def print_ondemand_label_kingsize( label_title, label_title2 ):
+	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
+	
+	label_title: title on the label (the only text to print) """
+	qty = 1 # Print only one label
+
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )	
+	d.field( origin=(125,11), font=d.font('V',80,71), data= unicode(label_title) ) 
+	if len( label_title2 )>0:
+		d.field( origin=(125,11+80), font=d.font('V',80,71), data= unicode(label_title2) ) 
+		
+	#top = 62
+	#for line in label_lines:
+	#	d.field( origin=(175, top), font=d.font('C'), data=line )
+	#	top = top + 25
+	
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
 
 def print_ondemand_label_short( label_title, label_lines, qty ):
 	""" Print the Labels on the LP2824 on small labels 
@@ -499,6 +539,7 @@ def main():
 		print( '  id : id product to print    | partial_code: to search' )
 		print( '  +ol: On demand label (Large)| +al         : address label' )
 		print( '  +os: On demand label (Short)| +openl      : open for... label' )
+		print( '  +ok: On demand label (King) | ')
 		print( '  +q : quit ' )
 		print( '='*40 )
 		print( '' )
@@ -521,6 +562,13 @@ def main():
 			ondemand_label_large()
 		elif value == '+os': #On_demand Short label
 			ondemand_label_short()
+		elif value == '+ok': #On_demand King Size Label
+			line1 = raw_input( 'Line 1: ' )
+			if line1 == '+q' or line1 == '':
+				continue
+			line2 = raw_input( 'Line 2: ' )
+			
+			print_ondemand_label_kingsize( line1, line2 )
 		elif value == '+al': # adress Label
 			value = raw_input( 'How many labels or +q: ' )
 			if value == '+q' or value=='0':
