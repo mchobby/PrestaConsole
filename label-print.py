@@ -108,7 +108,7 @@ def print_for_product( cachedphelper, id ):
 			label_size = 'large'
 	
 
-	if len( item.ean13 )>0 :
+	if len( item.ean13 )>0 and (item.ean13 != 0) :
 		product_ean = item.ean13
 		print( '%i : %s - %s ' % (id,item.reference,product_ean) )
 	else:
