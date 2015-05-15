@@ -91,6 +91,13 @@ class PrestaHelper(object):
 		
 	def search( self, pattern, options ):
 		""" Giving access to search capability of underlaying PrestaShop WebService """
+		
+		# Search are organised as follow 
+		#    (Store URL)/api/customers/?display=[firstname,lastname]&filter[id]=[1|5]
+		#    (store URL)/api/orders/?display=[id,current_state]&limit=25&sort=id_DESC
+		# See source:
+		#    http://doc.prestashop.com/display/PS14/Chapter+8+-+Advanced+Use
+		#    
 		return self.__prestashop.search( pattern, options = options )
 				
 	def get_accessrights( self ):
@@ -208,9 +215,16 @@ class PrestaHelper(object):
 		
 	def get_order_ids( self, order_state_filter, limit = 25 ):
 		""" Retreive a list of Order ID stored in prestashop for a given
-			status"""
-		el = self.__prestashop.search( 'orders', options={'limit':limit, 'sort' : 'id_DESC', 'display':'[id,current_state]', 'filter[current_state]': '[%i]' % order_state_filter } )
+			status. Start from the highest ID in the database with 
+			a max of limit rows loaded via the API"""
+		# Since PrestaShop 1.6, current_state is no more filterable (returns an Error 400 bad request)
+		#   So filter must be applied by code! 
+		#
+		# el = self.__prestashop.search( 'orders', options={'limit':limit, 'sort' : 'id_DESC', 'display':'[id,current_state]', 'filter[current_state]': '[%i]' % order_state_filter } )
+		el = self.__prestashop.search( 'orders', options={'limit':limit, 'sort' : 'id_DESC', 'display':'[id,current_state]' } )
+		
 		items = etree_to_dict( el )
+				 
 		# print( items )
 		# Si aucune entrée due au filtrage (oui cela arrive)
 		if isinstance( items['prestashop']['orders'], str ):
@@ -224,7 +238,9 @@ class PrestaHelper(object):
 		# print( order_list )
 		_result = []
 		for order in order_list:
-			_result.append( int(order['id']) )
+			if (order_state_filter == None) or (int(order['current_state']['#text']) == order_state_filter): 
+				_result.append( int(order['id']) )
+								
 		return _result
 		
 		
