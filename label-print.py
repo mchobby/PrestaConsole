@@ -660,8 +660,8 @@ def main():
 			counter_start = raw_input( 'N° première étiquette ou +q (ex:150021): ' )
 			if counter_start == '+q':
 				continue
-			counter_start = int( counter_start )
-			how_many_label= raw_input( "Combien d'étiquette ou +q              : " )
+			counter_start = int( counter_start ) 
+			how_many_label= raw_input( "Combien d'étiquette ou +q             : " )
 			if how_many_label == '+q':
 				continue
 			how_many_label = int( how_many_label )
