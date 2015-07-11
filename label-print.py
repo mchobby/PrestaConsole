@@ -32,8 +32,13 @@ from config import Config
 from pprint import pprint
 import logging
 import sys
+import signal
 
 from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
+
+def catch_ctrl_C(sig,frame):
+    print "Il est hors de question d'autoriser la sortie sauvage!"
+signal.signal(signal.SIGINT, catch_ctrl_C)
 
 PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
 PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
@@ -158,7 +163,7 @@ def print_for_product( cachedphelper, id ):
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
 		return
-	 
+	
 def print_product_label( product_id, product_ref, product_ean, qty ):
 	""" Print the Labels on the Zebra LP 2824 on 1.25" x 1" labels """
 	#print product_id
@@ -264,6 +269,48 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	finally:
 		medium.close()  
 		               
+	
+	del( medium )
+
+def print_warranty_label_large( prefix_text, counter_start, label_count ):
+	""" Print the Warranty Label on the GK420t on 70mm width x 2.5mm height labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+
+	for label_counter in range( label_count ):
+		d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = 'Warranty %s for %i' % (prefix_text, counter_start+counter_start + label_counter) )
+	
+		# Start a Print format
+		d.format_start()
+
+		# Write a BarCode field
+		d.field( origin=(175,11), font=d.font('T',17,8), data= unicode( 'Garantie / Warranty') ) # use font E as default
+		d.field( origin=(175,62), font=d.font('T',17,8), data= unicode( '%s-%i' % (prefix_text, counter_start + label_counter) ) )# use font E as default
+	
+		#d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
+		# d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+		
+		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, vous les conditions' )
+		d.field( origin=(175,145), font=d.font('C'), data=u'générales de ventes sur shop.mchobby.be' )
+	
+
+		# End Print format
+		d.format_end()
+
+	
+		medium.open() # Open the media for transmission. 
+					  # With CUPS medium this open a temporary file
+		try:
+			d.send()  # With CUPS medium this send the data to the temporary file
+			medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+		finally:
+			medium.close()
+			del( d )  
+		
 	
 	del( medium )
 
@@ -539,7 +586,7 @@ def main():
 		print( '  id : id product to print    | partial_code: to search' )
 		print( '  +ol: On demand label (Large)| +al         : address label' )
 		print( '  +os: On demand label (Short)| +openl      : open for... label' )
-		print( '  +ok: On demand label (King) | ')
+		print( '  +ok: On demand label (King) | +w          : Warranty')
 		print( '  +q : quit ' )
 		print( '='*40 )
 		print( '' )
@@ -606,6 +653,20 @@ def main():
 				u'',
 				u'',
 				u'MC Hobby SPRL' ], qty )
+		elif value == '+w':
+			prefix_str = raw_input(    'Préfix ou +q (ex:ELI-MEGA)             : ' )
+			if value == '+q':
+				continue
+			counter_start = raw_input( 'N° première étiquette ou +q (ex:150021): ' )
+			if counter_start == '+q':
+				continue
+			counter_start = int( counter_start )
+			how_many_label= raw_input( "Combien d'étiquette ou +q              : " )
+			if how_many_label == '+q':
+				continue
+			how_many_label = int( how_many_label )
+
+			print_warranty_label_large( prefix_text = prefix_str, counter_start = counter_start, label_count = how_many_label )
 				
 		elif value.isdigit():
 			print_for_product( cachedphelper, int(value) )
