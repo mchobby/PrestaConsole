@@ -7,9 +7,22 @@ Only reads the Prestashop API, NO WRITES!
 To use those snip of code, you will need your own "config.ini" file.
 You can create if from the config-sample.ini explaining the expected information.
 
+some scripts (eg: label-print.py) relies on a PCL generator python code.
+The code is stored within the PythonPCL GitHub available at:
+  https://github.com/mchobby/PythonPcl.git
+If the script tries to load it but the code is not available then you get the error message:
+
+ImportError: No module named pypcl
+
+What I'm usually doing:
+* git clone https://github.com/mchobby/PythonPcl.git
+* create a symbolic link pypcl in PrestaConsole to the target the pypcl code.
+```cd PrestaConsole
+ln -s ./../PythonPcl/pypcl pypcl``` 
+
 # Remarks
 
-*STILL UNDER DEVELOPMENT*
+**STILL UNDER DEVELOPMENT**
 
 This code is stable but still buggy.
 
