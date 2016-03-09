@@ -3,18 +3,17 @@ This project contains some code around the PrestaShop API in Python.
 The aim of this project is to help in createing administrative tools around an existing PrestaShop Installation.
 Only reads the Prestashop API, NO WRITES!
 
---- Installation ---
+#  Installation 
 To use those snip of code, you will need your own "config.ini" file.
 You can create if from the config-sample.ini explaining the expected information.
 
---- Remarks ---
+# Remarks
 
-*******************************
-*** STILL UNDER DEVELOPMENT ***
-*******************************
+*STILL UNDER DEVELOPMENT*
+
 This code is stable but still buggy.
 
---- GNU Licence ---
+# GNU Licence
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
