@@ -20,7 +20,7 @@ class PrestaHelperTest( object ):
 		print( '******************************************************************' )
 		#self.test_accessrights()
 		#self.test_lastcustomermessage_id()
-		self.test_lastcustomermessages()
+		#self.test_lastcustomermessages()
 		#self.test_customerthread() 
 		#self.test_carriers()
 		#self.test_order_states()
@@ -28,10 +28,22 @@ class PrestaHelperTest( object ):
 		#self.test_products() # Prefer using the CachedPrestaHelper class
 		#self.test_bad_stock_config_ids()
 		#self.test_suppliers()
-		self.test_product_suppliers()
+		#self.test_product_suppliers()
 		#self.test_categories()
 		#self.test_stock_available()
+		self.test_customer()
 	
+	def test_customer(self):
+		""" Affiche les détails d'un client """
+		customer_id = 8011 # exemple of valid customer ID
+		customer = self._pHelper.get_customer( customer_id )
+		print( '--- id: %s -------------' % customer.id )
+		print( '   Cust.Name : %s' % customer.customer_name )
+		print( '   email     : %s ' % customer.email )
+		print( '   id_lang   : %s ' % customer.id_lang )
+		print( '   id_gender : %s ' % customer.id_gender )
+		print( '   note      : %s ' % customer.note )
+		
 	def test_accessrights(self):
 		""" affiche la liste des droits """
 		rights = self._pHelper.get_accessrights()

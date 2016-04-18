@@ -466,7 +466,7 @@ def ondemand_label_large():
 	if title == '+q': # user abord
 		return
 	
-	print( 'Key in the lines (+q to quit, empty to proceed)' )
+	print( 'Key in the lines (6 lines max, +q to quit, empty to proceed)' )
 	iLine = 0
 	while True:
 		iLine += 1
@@ -493,6 +493,30 @@ def ondemand_label_large():
 	if qty > 25:
 		print( 'Max 25 labels allowed! Value sharped to 25.' )
 		qty = 25
+		
+	print_ondemand_label_large( title, lines, qty )
+
+def print_vat_labels():
+	""" Ask the user for the data to print an OnDemand label for large format """
+	lines = [] 
+	title = 'Exempte de TVA Belge' # Title cannot be unicode
+	 
+	# Decode the line otherwise the unicode quest an ascii string
+	lines.append( u"Conformément à l'Article 39 bis du Code"  )
+	lines.append( u"de la TVA."  )
+	lines.append( u"Livraison Intracommunautaire de Biens."  )
+	lines.append( u"Autoliquidation."  )
+	
+	value = raw_input( 'How many labels ?' )
+	if value == 0:
+		return
+	if value == '': # By default, 1 label
+		value = 1
+		
+	qty = int( value )
+	if qty > 50:
+		print( 'Max 50 labels allowed! Value sharped to 50.' )
+		qty = 50
 		
 	print_ondemand_label_large( title, lines, qty )
 
@@ -587,6 +611,7 @@ def main():
 		print( '  +ol: On demand label (Large)| +al         : address label' )
 		print( '  +os: On demand label (Short)| +openl      : open for... label' )
 		print( '  +ok: On demand label (King) | +w          : Warranty')
+		print( '                              | +vat        : vat intracom text' )
 		print( '  +q : quit ' )
 		print( '='*40 )
 		print( '' )
@@ -667,6 +692,9 @@ def main():
 			how_many_label = int( how_many_label )
 
 			print_warranty_label_large( prefix_text = prefix_str, counter_start = counter_start, label_count = how_many_label )
+		
+		elif value == '+vat':
+			print_vat_labels()
 				
 		elif value.isdigit():
 			print_for_product( cachedphelper, int(value) )
