@@ -356,11 +356,10 @@ def print_ondemand_label_large( label_title, label_lines, qty ):
 	
 	del( medium )
 	
-def print_ondemand_label_kingsize( label_title, label_title2 ):
+def print_ondemand_label_kingsize( label_title, label_title2, qty=1 ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
 	
 	label_title: title on the label (the only text to print) """
-	qty = 1 # Print only one label
 
 	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
@@ -639,8 +638,18 @@ def main():
 			if line1 == '+q' or line1 == '':
 				continue
 			line2 = raw_input( 'Line 2: ' )
-			
-			print_ondemand_label_kingsize( line1, line2 )
+                        value = raw_input( 'How many lables or +q: ' )
+                        if value == '+q' or value == '0':
+                                continue
+                        if value == '':
+			        value = '1'
+                        qty = int( value )
+                        if qty > 25:
+                                qty = 25
+                                print( 'Max 25 labels allowed! Value sharped to 25' )
+                                
+			print_ondemand_label_kingsize( line1, line2, qty )
+
 		elif value == '+al': # adress Label
 			value = raw_input( 'How many labels or +q: ' )
 			if value == '+q' or value=='0':
