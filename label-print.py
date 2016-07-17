@@ -246,15 +246,15 @@ def print_product_label_medium( product_id, product_ref, product_ean, qty ):
 	if qty > 1:
 		d.print_quantity( qty )			
 	
-	d.field( origin=(40,11), font=d.font('E'), data= unicode( product_ref ) )
+	d.field( origin=(30,11), font=d.font('E'), data= unicode( product_ref ) )
 
 	# Write a BarCode field
-	d.ean13( origin=(180,60), ean=unicode(product_ean), height_dots = 50 )
+	d.ean13( origin=(210,60), ean=unicode(product_ean), height_dots = 50 )
 	
-	d.field( origin=(45,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
-	d.field( origin=(100,145), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	d.field( origin=(35,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	d.field( origin=(100,165), font=d.font('C'), data=u'Happy Electronic Hacking!' )
 	
-	d.field( origin=(285,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	d.field( origin=(305,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
 	# End Print format
 	d.format_end()
 
