@@ -158,7 +158,7 @@ def print_for_product( cachedphelper, id ):
 		
 		if label_size == 'small':
 			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
-			print_product_label( product_id, product_ref, product_ean, int(value) )
+			print_product_label_medium( product_id, product_ref, product_ean, int(value) )
 		else:
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
@@ -229,7 +229,73 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 		               
 	
 	del( medium )
+
+def print_product_label_medium( product_id, product_ref, product_ean, qty ):
+	""" Print the Labels on the Zebra LP 2824 on 50mm large. 2" x 1" labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Label is printed with 2 lines of 10 characters
+	l1 = product_ref[:10] 
+	l2 = product_ref[10:]
+	
+	# Write product name
+	#   we will try to offer a human redeable text (2x10 chars) on the  
+	#   label properly cut the text around ' ', '-'
+	iPos = max( l1.rfind( ' ' ), l1.rfind( '-' ) )
+	if iPos == -1 or iPos == 9 or len( product_ref ) <= 10: 
+		# The text too short or not appropriate to cute it.
+        # Just cut it without care.
+		l1 = product_ref.ljust(20)[:10] 
+		l2 = product_ref.ljust(20)[10:]
+	else:
+		iShouldMove = 10 - (iPos+1)
+		if len( l2 )+ iShouldMove <= 10: # if second line would not exceed max len ?
+			# We go for nicely cutting it!
+			l2 = l1[iPos+1:] + l2
+			l1 = l1[:iPos+1] 
+		else:
+			# Keep the cut without care
+			l1 = product_ref.ljust(20)[:10] 
+			l2 = product_ref.ljust(20)[10:]
+			
+	
+	d.field( origin=(80,11), font=d.font('E'), data= unicode( l1 ) )
+	d.field( origin=(80,42), font=d.font('E'), data= unicode( l2 ) )
+	# Write a BarCode field
+	d.ean13( origin=(80,80), ean=unicode(product_ean), height_dots = 50 )
+	
+	d.field( origin=(90,160), font=d.font('C'), data=u'shop.mchobby.be' )
+	d.field( origin=(8,185), font=d.font('C'), data=u'MC Hobby sprl' )
+	
+	d.field( origin=(265,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
 def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels """
 	#print product_id
