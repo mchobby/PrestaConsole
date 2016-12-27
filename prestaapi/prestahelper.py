@@ -1399,3 +1399,11 @@ class BaseProductList( BaseDataList ):
 			if sProductRef.find( _sToFind )>=0 :
 				_result.append( item )
 		return _result
+
+	def search_products_for_ean( self, sEan ):
+		""" Find an active product from a partial reference """
+		_result = []
+		for item in self:
+			if item.ean13 == sEan:
+				_result.append( item )
+		return _result
