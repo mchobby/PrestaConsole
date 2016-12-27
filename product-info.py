@@ -53,6 +53,7 @@ ID_SUPPLIER_PARAMS = None
 def list_products( cachedphelper, key=None, ean=None, id=None ):
 	""" Search for a product base on its partial reference code (key) -OR- its ean -OR- product ID + list them """
 	
+	result = None
 	if key:
 		assert isinstance( key, str ), 'Key must be a string'
 		if len( key ) < 3:
