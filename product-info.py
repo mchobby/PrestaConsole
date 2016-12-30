@@ -30,17 +30,17 @@ from prestaapi import PrestaHelper, CachedPrestaHelper
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
 from pprint import pprint
-import logging
+import logging, os
+from logging.handlers import SysLogHandler # Send entries to syslog server
 import sys
 import signal
+import curses
+from time import sleep
 
 # from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
-
-def catch_ctrl_C(sig,frame):
-    print "Il est hors de question d'autoriser la sortie sauvage!"
-signal.signal(signal.SIGINT, catch_ctrl_C)
-
 PRINTER_ENCODING = 'cp850'
+
+LOGGING_LEVEL = logging.ERROR # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 config = Config()
 logging.basicConfig( filename=config.logfile, level=logging.DEBUG, 
@@ -49,6 +49,123 @@ logging.basicConfig( filename=config.logfile, level=logging.DEBUG,
 
 # LABEL Size is stored into the article reference of the "PARAMS" supplier.
 ID_SUPPLIER_PARAMS = None
+
+class MyApp:
+	def __init__( self, screen ):
+		self.screen = screen 
+		(self.height, self.width) = screen.getmaxyx()
+		self.subwin = [] # Subwin list
+		self.create_subwin()
+
+		# Create a SysLog handler
+		self.logger = logging.getLogger()
+		self.logger.setLevel( logging.DEBUG )
+		# Follow the log with
+		#    tail -f /var/log/syslog 
+		# formatter = logging.Formatter('%(asctime)s :: %(levelname)s :: %(message)s')
+		#    also mention the python filename in the log
+		formatter = logging.Formatter( os.path.basename(__file__)+' :: %(levelname)s :: %(message)s')
+		sys_handler = SysLogHandler( address = '/dev/log')
+		sys_handler.setLevel( LOGGING_LEVEL )
+		sys_handler.setFormatter( formatter )
+		self.logger.addHandler( sys_handler )
+
+		self.logger.info( 'Starting app' )
+
+	def create_subwin(self):
+		self.wresult = curses.newwin(self.height-1,self.width,0,0) # NLines, NCols, begin_y, begin_x
+		self.wresult.border()
+		self.wresult.addstr(0,2,"[ Result ]")
+		self.wresult.addstr(1,1,"%i , %i" % self.wresult.getmaxyx() )
+		self.subwin.append( (self.wresult,self.wresult_redraw) )
+
+		self.status = curses.newwin(2,self.width,self.height-1,0) # min 2 lines height!!!
+
+	def wresult_redraw(self):
+		""" redraw the subwin background """
+		self.wresult.clear()
+		self.wresult.border()
+		self.wresult.addstr( 0, 2, "[ Result ]" )
+
+	#def draw_screen(self)
+
+	def draw_status( self, input_text=None, input_data=None, refresh_time=0 ):
+		""" redraw the status bar """
+		self.status.addstr( 0, 0, " "*self.width, curses.A_REVERSE )
+
+		# Only draw information in the second part of the screen
+		self.status.addstr( 0, self.width//2, '%1d:%02d' % (refresh_time//60,refresh_time%60), curses.A_REVERSE )
+		
+		# Draw input_text and input_data in the first part of the screen
+		if input_text or input_data:
+			_s = "%s%s" % (input_text,input_data)
+			self.status.addstr( 0, 1, _s, curses.A_REVERSE )
+
+	def refresh( self ):
+		""" makes curses redrawing the whole screen content """ 
+		for win, redraw  in self.subwin:
+			win.refresh()
+		self.status.refresh()
+
+	def input( self, text = '?' ):
+		""" capture a string from the keyboard, each characters in the status bar.
+		returns a tuple (input_string,last_ch_ascii_code) """
+		_r = ''
+		self.draw_status( input_text=text, input_data=_r )
+
+		ch = 0
+		while True:
+			ch = self.status.getch()
+			self.logger.debug( 'getch returned %i' % ch )
+			if ch in (13,10): # CR/LF
+				break
+			elif ch == 127: # backspace
+			    if len(_r)>0:
+					_r = _r[:-1]
+			elif ch == 27: # escape
+				if len(_r)>0: # First time, we clear the input
+					_r = ''
+				else:
+					break # Second time (so when empty): we exit the input 
+			else:
+				_r = _r + chr(ch)
+
+			# Display the current value
+			self.draw_status( input_text=text, input_data=_r )
+			self.status.refresh()
+
+		# Clear input field zone in the status bar
+		self.draw_status( input_text=None, input_data=None )
+		self.status.refresh()
+
+		self.logger.debug( 'input() returns with "%s" and last key %i' % (_r,ch) )
+		return (_r,ch)
+
+	def run( self ):
+		self.screen.clear()
+		# Draw the screen
+		self.wresult_redraw()
+		self.draw_status()
+		# Refresh the output
+		self.refresh()
+
+		while True:
+			(_cmd,_ch) = self.input( text='Cmd?' )
+
+			# special commands
+			if _cmd.upper() == '+Q':
+				break # Exit the software
+
+			self.wresult.addstr(2,2, 'exit with %i and "%s" result' %(_ch,_cmd) )
+			self.refresh()
+		
+
+def main(screen):
+	# Cursor invisible
+	#curses.curs_set( 0 )
+	curses.start_color()
+	app = MyApp( screen )
+	app.run()
 
 def list_products( cachedphelper, key=None, ean=None, id=None ):
 	""" Search for a product base on its partial reference code (key) -OR- its ean -OR- product ID + list them """
@@ -128,7 +245,7 @@ def product_id_to_ean13():
 		
 
 	
-def main():
+def main2():
 	def progressHandler( prestaProgressEvent ):
 		if prestaProgressEvent.is_finished:
 			print( '%s' %prestaProgressEvent.msg )
@@ -201,6 +318,11 @@ def main():
 
 	return
 
+def catch_ctrl_C(sig,frame):
+    print "Il est hors de question d'autoriser la sortie sauvage!"
+
 if __name__ == '__main__':
-	main()
+	# signal.signal(signal.SIGINT, catch_ctrl_C)
+	curses.wrapper( main )
+	# main2()
 
