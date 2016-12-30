@@ -70,7 +70,8 @@ def list_products( cachedphelper, key=None, ean=None, id=None ):
 
 	if result: 
 		for item in result:
-			print( '%4i : %s - %s' % (item.id,item.reference.ljust(20),item.name) )
+			print( '%4i: %s (%6.2f) %6.2f EUR' % (item.id,item.reference.ljust(20),item.price,item.price*1.21) )
+			print( '      %s' % item.name )
 	else:
 		print( 'Nothing for %s' % ean )
 		
