@@ -40,12 +40,15 @@ from time import sleep
 # from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 PRINTER_ENCODING = 'cp850'
 
-LOGGING_LEVEL = logging.ERROR # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOGGING_LEVEL = logging.DEBUG # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
-config = Config()
-logging.basicConfig( filename=config.logfile, level=logging.DEBUG, 
-	format='%(asctime)s - [%(levelname)s] %(message)s',
-	datefmt='%d/%m/%y %H:%M:%S.%f' )
+HELP_MESSAGE = """+Q : quit
++R : reload 
++S : save"""
+
+#logging.basicConfig( filename=config.logfile, level=logging.DEBUG, 
+#	format='%(asctime)s - [%(levelname)s] %(message)s',
+#	datefmt='%d/%m/%y %H:%M:%S.%f' )
 
 # LABEL Size is stored into the article reference of the "PARAMS" supplier.
 ID_SUPPLIER_PARAMS = None
@@ -71,6 +74,20 @@ class MyApp:
 		self.logger.addHandler( sys_handler )
 
 		self.logger.info( 'Starting app' )
+		self.config = Config()
+		self.cachedphelper  = CachedPrestaHelper( self.config.presta_api_url, self.config.presta_api_key, debug = False ) #, progressCallback = progressHandler )
+		# initialize global variables
+		self.initialize_globals()
+
+	def initialize_globals( self ):
+		""" Initialize the global var @ startup or @ reload """
+		global ID_SUPPLIER_PARAMS
+		_item = self.cachedphelper.suppliers.supplier_from_name( "PARAMS" )
+		#for _item in cachedphelper.suppliers:
+		#	print( '%i - %s' % (_item.id,_item.name) )
+		if _item != None:
+			ID_SUPPLIER_PARAMS = _item.id
+			self.logger.info( 'Catched PARAMS supplier :-). ID: %i' % ID_SUPPLIER_PARAMS )	
 
 	def create_subwin(self):
 		self.wresult = curses.newwin(self.height-1,self.width,0,0) # NLines, NCols, begin_y, begin_x
@@ -89,17 +106,21 @@ class MyApp:
 
 	#def draw_screen(self)
 
-	def draw_status( self, input_text=None, input_data=None, refresh_time=0 ):
+	def draw_status( self, input_text=None, input_data=None, info=None ):
 		""" redraw the status bar """
 		self.status.addstr( 0, 0, " "*self.width, curses.A_REVERSE )
 
 		# Only draw information in the second part of the screen
-		self.status.addstr( 0, self.width//2, '%1d:%02d' % (refresh_time//60,refresh_time%60), curses.A_REVERSE )
+		info = '| +h for Help' if info==None else '| %s'%info
+		info = info + ' '*(self.width//2-len(info))
+		self.status.addstr( 0, self.width//2, '%s' % info, curses.A_REVERSE )
 		
 		# Draw input_text and input_data in the first part of the screen
 		if input_text or input_data:
-			_s = "%s%s" % (input_text,input_data)
+			_s = "%s%s" % (input_text,input_data if input_data else '')
 			self.status.addstr( 0, 1, _s, curses.A_REVERSE )
+
+		self.status.refresh()
 
 	def refresh( self ):
 		""" makes curses redrawing the whole screen content """ 
@@ -136,10 +157,86 @@ class MyApp:
 
 		# Clear input field zone in the status bar
 		self.draw_status( input_text=None, input_data=None )
-		self.status.refresh()
 
 		self.logger.debug( 'input() returns with "%s" and last key %i' % (_r,ch) )
 		return (_r,ch)
+
+	def search_products( self, key=None, ean=None, id=None ):
+		""" Search for a product based on its partial reference code (key) -OR- its ean -OR- product ID.
+
+		:return: None or a list of product """
+		
+		result = None
+		if key:
+			assert isinstance( key, str ), 'Key must be a string'
+			if len( key ) < 3:
+				print( 'searching product requires at least 3 characters' )
+				return
+			result = self.cachedphelper.products.search_products_from_partialref( key )
+		elif ean:
+			assert isinstance( ean, str ), 'Key must be a string'
+			result = self.cachedphelper.products.search_products_for_ean( ean )
+		elif id:
+			assert isinstance( id, int ), 'ID must be an integer'
+			_r = self.cachedphelper.products.product_from_id( id )
+			result = [_r] if _r else None
+
+		return result
+
+	def display_products( self, products, auto_select=False ):
+		""" Display a list of products in the wresult Windows 
+
+		:param products: list of product to display.
+		:param auto_select: automaticaly select the first row WHEN it is the unique row! """
+		self.logger.debug('display_products')
+		iTopIndex = 0 # Index of the TOP record in the products list
+		iSelected = 0 # Index of the ITEM currently selected 
+		hClient = self.wresult.getmaxyx()[0] - 2 # Height of the client area
+		wclient = self.wresult.getmaxyx()[1] - 2
+		while products and len( products )>0: # At least one item
+			self.wresult_redraw()
+			iRow = 0
+			for i in range(iTopIndex,iTopIndex+hClient):
+				# self.logger.debug( '%i' % i)
+				if i >= len(products):
+					continue
+				item = products[i]
+				_s = '%4i: %s (%6.2f) %6.2f EUR' % (item.id,item.reference.ljust(20),item.price,item.price*1.21) 
+				self.wresult.addstr( iRow+1,1, _s, curses.A_REVERSE if i == iSelected else 0 )
+				iRow += 1
+			self.wresult.refresh()
+
+			# auto_select
+			if len( products )==1 and auto_select:
+				return products[0]
+
+			# user input
+			self.draw_status( input_text='browsing result...')
+			ch = self.status.getch()
+			self.logger.debug( 'getch returned %i' % ch )
+			if ch in (13,10): # CR/LF
+				return products[iSelected]
+			#elif ch == 27: #ESC -- also returned with escape sequence....
+			#	return None
+			elif ch == 66: # arrow down
+				# Select next
+				iSelected += 1
+				if iSelected >= len( products ):
+					iSelected = len( products )-1
+				# Keep selected row visible
+				if iSelected >= (iTopIndex + hClient):
+					iTopIndex += 1
+			elif ch == 65: # arrow up
+				iSelected -= 1
+				if iSelected <= 0:
+					iSelected = 0
+				# Keep selected row visible
+				if iSelected < iTopIndex:
+					iTopIndex = iSelected
+
+		# Always return something
+		return None 
+
 
 	def run( self ):
 		self.screen.clear()
@@ -155,8 +252,46 @@ class MyApp:
 			# special commands
 			if _cmd.upper() == '+Q':
 				break # Exit the software
+			elif _cmd.upper() == '+R':
+				self.draw_status( info='Contacting WebShop and reloading...' )
+				self.cachedphelper.load_from_webshop()
+				initialize_globals() # reinit global variables
+				self.draw_status( info='Data reloaded!')
+				sleep( 1 )
+				continue	
+			elif _cmd.upper() == '+S':
+				print( 'Saving cache...' )
+				self.draw_status( info = 'Saving cache...')
+				cachedphelper.save_cache_file()
+				self.draw_status( info='Data saved!' )
+				sleep( 1 )
+				continue
+			elif _cmd.upper() == '+H':
+				# Display the Help
+				self.wresult_redraw()
+				for idx, line in enumerate( HELP_MESSAGE.split('\n') ):
+					self.wresult.addstr( 1+idx,1, line )
+				self.wresult.refresh()
+				self.draw_status(input_text='Press return to continue')
+				self.wresult.getch()
+				self.wresult_redraw()
 
-			self.wresult.addstr(2,2, 'exit with %i and "%s" result' %(_ch,_cmd) )
+					
+			_l = None # List of products
+			if _cmd.isdigit():
+				if len(_cmd)<=5: # we are looking for a product ID
+					_l = self.search_products( id=int(_cmd) )
+				else:
+					_l = self.search_products( ean=_cmd )
+			else:
+				if len(_cmd)<3:
+					self.draw_status( input_text='Min. 3 chars!!!' )
+					sleep( 1 )
+				else:
+					_l = self.search_products( key=_cmd )
+			# Show the product on the screen
+			self.display_products( _l, auto_select=True )
+			
 			self.refresh()
 		
 
@@ -252,15 +387,7 @@ def main2():
 		else:
 			print( '%i/%i - %s' % ( prestaProgressEvent.current_step, prestaProgressEvent.max_step, prestaProgressEvent.msg ) )
 
-	def initialize_globals():
-		""" Initialize the global var @ startup or @ reload """
-		global ID_SUPPLIER_PARAMS
-		_item = cachedphelper.suppliers.supplier_from_name( "PARAMS" )
-		#for _item in cachedphelper.suppliers:
-		#	print( '%i - %s' % (_item.id,_item.name) )
-		if _item != None:
-			ID_SUPPLIER_PARAMS = _item.id
-			print( 'Catched PARAMS supplier :-). ID: %i' % ID_SUPPLIER_PARAMS )	
+
     
     # A CachedPrestaHelper is a PrestaHelper with cache capabilities	
 	cachedphelper = CachedPrestaHelper( config.presta_api_url, config.presta_api_key, debug = False, progressCallback = progressHandler )
