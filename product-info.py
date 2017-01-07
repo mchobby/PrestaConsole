@@ -106,7 +106,7 @@ class MyApp:
 
 	#def draw_screen(self)
 
-	def draw_status( self, input_text=None, input_data=None, info=None ):
+	def status_redraw( self, input_text=None, input_data=None, info=None ):
 		""" redraw the status bar """
 		self.status.addstr( 0, 0, " "*self.width, curses.A_REVERSE )
 
@@ -122,8 +122,18 @@ class MyApp:
 
 		self.status.refresh()
 
+	def screen_redraw( self ):
+		""" Draw every subwindow THEN refresh the whole terminal """
+		self.screen.clear()		
+		# full screen redraw
+		for win, redraw in self.subwin:
+		    redraw()
+		self.status_redraw()
+		# Refresh the output
+		self.refresh()
+
 	def refresh( self ):
-		""" makes curses redrawing the whole screen content """ 
+		""" makes curses refreshing the whole terminal content """ 
 		for win, redraw  in self.subwin:
 			win.refresh()
 		self.status.refresh()
@@ -132,7 +142,7 @@ class MyApp:
 		""" capture a string from the keyboard, each characters in the status bar.
 		returns a tuple (input_string,last_ch_ascii_code) """
 		_r = ''
-		self.draw_status( input_text=text, input_data=_r )
+		self.status_redraw( input_text=text, input_data=_r )
 
 		ch = 0
 		while True:
@@ -152,11 +162,11 @@ class MyApp:
 				_r = _r + chr(ch)
 
 			# Display the current value
-			self.draw_status( input_text=text, input_data=_r )
+			self.status_redraw( input_text=text, input_data=_r )
 			self.status.refresh()
 
 		# Clear input field zone in the status bar
-		self.draw_status( input_text=None, input_data=None )
+		self.status_redraw( input_text=None, input_data=None )
 
 		self.logger.debug( 'input() returns with "%s" and last key %i' % (_r,ch) )
 		return (_r,ch)
@@ -211,7 +221,7 @@ class MyApp:
 				return products[0]
 
 			# user input
-			self.draw_status( input_text='browsing result...')
+			self.status_redraw( input_text='browsing result...')
 			ch = self.status.getch()
 			self.logger.debug( 'getch returned %i' % ch )
 			if ch in (13,10): # CR/LF
@@ -239,12 +249,7 @@ class MyApp:
 
 
 	def run( self ):
-		self.screen.clear()
-		# Draw the screen
-		self.wresult_redraw()
-		self.draw_status()
-		# Refresh the output
-		self.refresh()
+		self.screen_redraw()
 
 		while True:
 			(_cmd,_ch) = self.input( text='Cmd?' )
@@ -253,17 +258,19 @@ class MyApp:
 			if _cmd.upper() == '+Q':
 				break # Exit the software
 			elif _cmd.upper() == '+R':
-				self.draw_status( info='Contacting WebShop and reloading...' )
+				self.status_redraw( info='Contacting WebShop and reloading...' )
 				self.cachedphelper.load_from_webshop()
-				initialize_globals() # reinit global variables
-				self.draw_status( info='Data reloaded!')
+				self.initialize_globals() # reinit global variables
+				self.screen_redraw()
+				self.status_redraw( info='Data reloaded!')
 				sleep( 1 )
 				continue	
 			elif _cmd.upper() == '+S':
 				print( 'Saving cache...' )
-				self.draw_status( info = 'Saving cache...')
-				cachedphelper.save_cache_file()
-				self.draw_status( info='Data saved!' )
+				self.status_redraw( info = 'Saving cache...')
+				self.cachedphelper.save_cache_file()
+				self.screen_redraw()
+				self.status_redraw( info='Data saved!' )
 				sleep( 1 )
 				continue
 			elif _cmd.upper() == '+H':
@@ -272,7 +279,7 @@ class MyApp:
 				for idx, line in enumerate( HELP_MESSAGE.split('\n') ):
 					self.wresult.addstr( 1+idx,1, line )
 				self.wresult.refresh()
-				self.draw_status(input_text='Press return to continue')
+				self.status_redraw(input_text='Press return to continue')
 				self.wresult.getch()
 				self.wresult_redraw()
 
@@ -285,7 +292,7 @@ class MyApp:
 					_l = self.search_products( ean=_cmd )
 			else:
 				if len(_cmd)<3:
-					self.draw_status( input_text='Min. 3 chars!!!' )
+					self.status_redraw( input_text='Min. 3 chars!!!' )
 					sleep( 1 )
 				else:
 					_l = self.search_products( key=_cmd )
