@@ -158,7 +158,7 @@ class MyApp:
 					_r = ''
 				else:
 					break # Second time (so when empty): we exit the input 
-			else:
+			elif 31 <= ch < 256:
 				_r = _r + chr(ch)
 
 			# Display the current value
