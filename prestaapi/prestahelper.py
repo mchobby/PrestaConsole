@@ -136,7 +136,23 @@ class PrestaHelper(object):
 			customermessage.load_from_xml( el )
 			_result.append( customermessage )
 		return _result
+	
+	def get_customer( self, id ):
+		""" Retreive the customer from the id 
 		
+		:param id: customer id (int) to retreive the customer information
+		
+		Returns:
+		A customer object
+		"""	
+		if not( isinstance( id, int )):
+			raise ValueError( 'id must be integer' )
+		logging.debug( 'read id_customer: %s ' % id )
+		el = self.__prestashop.get( 'customers', id )
+		customer = CustomerData( self )
+		customer.load_from_xml( el )
+		return customer
+
 	def get_customerthread( self, id ):
 		""" Retreive the custom thread data from thread id
 		
@@ -261,6 +277,22 @@ class PrestaHelper(object):
 			order.load_from_xml( el )
 			_result.append( order )
 		return _result
+	
+	def get_order_data( self, id ):
+		""" retreive the xml data for an order """
+		try:
+			return self.__prestashop.get( 'orders', id )
+		except PrestaShopWebServiceError as e:
+			if 'HTTP response is empty' in str(e):
+				return None # The given ID does not match an order!
+			else:
+				raise e
+	
+	def post_order_data( self, id, el ):
+		""" Post a modified xml data of an order """
+		self.__prestashop.debug = True
+		print( ElementTree.tostring( el ) )
+		return self.__prestashop.edit( 'orders', id, el )
 		
 	def get_outofstock_orderable_ids( self ):
 		""" Locate the product IDs where advanced stock management is
@@ -642,6 +674,28 @@ class CustomerThreadData( BaseData ):
 			_result.append( self.helper.get_lastcustomermessages( messageid )[0] )
 		return _result
 
+class CustomerData( BaseData ):
+	""" Contains the Customer dada """
+	__slots__ = ["id", "lastname", "firstname", "email", "id_gender", "id_lang", "note" ]
+	
+	def load_from_xml( self, node ):
+		# print( ElementTree.tostring( node ) )
+		items = etree_to_dict( node )
+		items = items['prestashop']['customer']
+		
+		self.id        = items['id']
+		self.lastname  = items['lastname']
+		self.firstname = items['firstname']
+		self.email     = items['email']
+		self.id_gender = items['id_gender']
+		self.id_lang   = items['id_lang']['#text']
+		self.note    = items['note' ]
+	
+	@property
+	def customer_name( self ):
+		return "%s %s" % (self.lastname, self.firstname)
+
+
 class CarrierData( BaseData ):
 	""" Contains the Carriers data """
 	__slots__ = ["id", "deleted", "active", "name" ]
@@ -659,7 +713,7 @@ class CarrierData( BaseData ):
 		self.id = dic['id']
 		self.deleted = dic['deleted']
 		self.active  = dic['active' ]
-		self.name    = dic['name' ] 
+		self.name    = dic['name' ]
 
 class CarrierList( BaseDataList ):
 	""" List of Carriers """
@@ -1343,5 +1397,13 @@ class BaseProductList( BaseDataList ):
 		for item in self:
 			sProductRef = item.canonical_reference()
 			if sProductRef.find( _sToFind )>=0 :
+				_result.append( item )
+		return _result
+
+	def search_products_for_ean( self, sEan ):
+		""" Find an active product from a partial reference """
+		_result = []
+		for item in self:
+			if item.ean13 == sEan:
 				_result.append( item )
 		return _result

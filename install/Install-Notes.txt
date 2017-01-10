@@ -3,22 +3,25 @@ Presta Console - Installation Notes
 === Needed Tools ===
 * Python 2.7 
 * Pip installer
+   sudo apt-get install python-pip
 * GIT
 
 === Needed Python Libs ===
 Use pip to install the following libs
-  * httplib2
-  * pyserial
-  * PrestaPyt
-  * LcdMtrx - see our Git Repository
-			 https://github.com/mchobby/lcdmtrx
-			 can be made available in the source code as "lcdmtrx" subfolder
-			   via a symbolic link to lcdmtrx/
+* httplib2
+  sudo pip install httplib2
+* pyserial
+* PrestaPyt
+  sudo pip install prestapyt
+* LcdMtrx - see our Git Repository
+  git clone https://github.com/mchobby/lcdmtrx
+  can be made available in the source code as "lcdmtrx" subfolder
+  via a symbolic link to lcdmtrx/
 
-  * PythonPcl - see our Git Repository
-             https://github.com/mchobby/PythonPcl
-             Can be made available in the source code as "pypcl" subfolder
-			   via a symbolic link to PythonPcl/pypcl
+* PythonPcl - see our Git Repository
+  git clone https://github.com/mchobby/PythonPcl
+  Can be made available in the source code as "pypcl" subfolder
+  via a symbolic link to PythonPcl/pypcl
 
 === Installation Instructions ===
 

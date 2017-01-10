@@ -158,7 +158,7 @@ def print_for_product( cachedphelper, id ):
 		
 		if label_size == 'small':
 			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
-			print_product_label( product_id, product_ref, product_ean, int(value) )
+			print_product_label_medium( product_id, product_ref, product_ean, int(value) )
 		else:
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			print_product_label_large( product_id, product_ref, product_ean, int(value) )	 
@@ -229,7 +229,48 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 		               
 	
 	del( medium )
+
+def print_product_label_medium( product_id, product_ref, product_ean, qty ):
+	""" Print the Labels on the Zebra LP 2824 on 50mm large. 2" x 1" labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )			
+	
+	d.field( origin=(25,15), font=d.font('E'), data= unicode( product_ref ) )
+
+	# Write a BarCode field
+	d.ean13( origin=(210,60), ean=unicode(product_ean), height_dots = 50 )
+	
+	d.field( origin=(35,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	d.field( origin=(80,165), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	
+	d.field( origin=(325,187), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
 def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels """
 	#print product_id
