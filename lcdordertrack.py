@@ -89,7 +89,7 @@ def setLcdColor( lcd, cachedHelper, order_data ):
 		# si Poste/Collisimo/UPS --> Urgent
 		if sCarrier.find(u'UPS') >= 0:
 			LcdColor = (255, 100, 0) # Jaune
-		elif (sCarrier.find( u'BPACK' ) >= 0 ) or ( sCarrier.find( u'COLIS' ) >= 0 ):
+		elif (sCarrier.find( u'BPACK' ) >= 0 ) or ( sCarrier.find( u'COLIS' ) >= 0 ) or ( sCarrier.find( u'HOME DELIVERY' ) >= 0 ) or ( sCarrier.find( u'PICK-UP POINT' ) >= 0 ) or ( sCarrier.find( u'PARCEL LOCKER' ) >= 0 ):
 			LcdColor = (230, 10, 10) # Rouge leger
 		elif sCarrier.find( u'MONDIAL' ) >= 0:
 			LcdColor = (20, 135, 20 ) # Vert léger
