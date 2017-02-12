@@ -93,6 +93,8 @@ def setLcdColor( lcd, cachedHelper, order_data ):
 			LcdColor = (230, 10, 10) # Rouge leger
 		elif sCarrier.find( u'MONDIAL' ) >= 0:
 			LcdColor = (20, 135, 20 ) # Vert léger
+		elif sCarrier.find( u'PICK' ) >= 0:
+			LcdColor = (21, 153, 255 ) # Bleu pastel
 		else:
 			LcdColor = (255, 120, 120 ) # plutot blanc
 	
@@ -115,7 +117,13 @@ def main():
 	bNewPayment     = False
 	paid_count		= 0
 	bankwire_count  = 0
-	
+
+	# Locate the ID_Payment for "Paiement par carte sur place"
+	PAY_AT_MCH = None
+	for order_state in cachedHelper.order_states:
+		if cachedHelper.order_states.name_from_id( order_state.id ).upper().find(u'CARTE SUR PLACE') >= 0:
+			PAY_AT_MCH = order_state.id
+
 	try:
 		# Force initial update
 		last_update_time = time.time() - UPDATE_DELAY
@@ -131,13 +139,18 @@ def main():
 				#   Exclude the REAPPROVISIONNEMENT state from light
 				#   the LCD. Payment is effectively DONE but
 				#   no work/shipping has to be prepared
-				bNewPayment = cachedHelper.order_states.is_new_order( last_orders_data[0].current_state ) and ( last_orders_data[0].current_state != OrderStateList.ORDER_STATE_REPLENISH )
+				# New order with "Payment sur place" will deliver money shortly
+				#   so it is also like a "new payment" --> switch on the light
+				bNewPayment = (cachedHelper.order_states.is_new_order( last_orders_data[0].current_state) or (cachedHelper.order_states.name_from_id( last_orders_data[0].current_state ).upper().find(u'CARTE SUR PLACE')>=0 )) and ( last_orders_data[0].current_state != OrderStateList.ORDER_STATE_REPLENISH )
 				
 				# Activate LCD when receiving a new payment 
 				setLcdColor( lcd, cachedHelper, last_orders_data[0] )
 				lcd.activate_lcd( bNewPayment )
 				paid_count = len( cachedHelper.get_order_ids( cachedHelper.order_states.ORDER_STATE_PAID ) )
 				bankwire_count = len( cachedHelper.get_order_ids( cachedHelper.order_states.ORDER_STATE_WAIT_BANKWIRE ) )
+				# Also add the "Paiement par carte sur place" in Bankwire count
+				if PAY_AT_MCH:
+					bankwire_count += len( cachedHelper.get_order_ids(PAY_AT_MCH))
 
 				last_update_time = time.time()
 			else: 
@@ -156,11 +169,15 @@ def main():
 			
 	except Exception, e:
 		lcd.clear_screen()
-		lcd.write( 'KABOUM!!' )
+		lcd.write_european_pos( 'KABOUM!!' )
+		lcd.write_european_pos( 2, 1, u'Restart in 5 Min' )
 		logging.exception( e )
+		time.sleep( 5*60 )
+		os.system( 'sudo reboot' )
+		return 0
 	return 0
 
 if __name__ == '__main__':
-	logging.info( 'LcdOrderTrack Started' )	
+	logging.info( 'LcdOrderTrack Started' )
 	main()
 	logging.info( 'LcdOrderTrack End' )	
