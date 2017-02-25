@@ -733,6 +733,11 @@ class CarrierList( BaseDataList ):
 	def load_from_xml( self, node ):
 		""" Load the Carrier list with data comming from prestashop search.
 			Must contains nodes: id, deleted, active, name """
+		# clear the inner lists
+		self.deletedlist = []
+		self.inactivelist = []
+
+		# reload the data
 		items = etree_to_dict( node )
 		items = items['prestashop']['carriers']['carrier']
 		for item in items:
@@ -796,6 +801,8 @@ class SupplierList( BaseDataList ):
 	def load_from_xml( self, node ):
 		""" Load the supplier list with data comming from prestashop search.
 			Must contains nodes: id, active, name """
+		self.inactivelist = []
+
 		items = etree_to_dict( node )
 		items = items['prestashop']['suppliers']['supplier']
 		for item in items:
@@ -1427,6 +1434,8 @@ class BaseProductList( BaseDataList ):
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
 			return _data
 
+		# empty the list previously loaded
+		self.inactivelist = [] 
 
 		items = etree_to_dict( node )
 		#print( items )
@@ -1528,6 +1537,7 @@ class BaseProductList( BaseDataList ):
 				sProductRef = item.canonical_reference()
 				if sProductRef.find( _sToFind )>=0 :
 					_result.append( item )
+					print( "match")
 		for item in self:
 			sProductRef = item.canonical_reference()
 			if sProductRef.find( _sToFind )>=0 :

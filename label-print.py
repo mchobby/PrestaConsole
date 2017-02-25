@@ -61,7 +61,7 @@ def list_products( cachedphelper, key ):
 	
 	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
 	for item in result:
-		print( '%7i : %s - %s' % (item.id,item.reference.ljust(20),item.name) )
+		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
 		
 def get_product_params_dic( cachedpHelper,id_product ):
 	""" Locate the product parameter stored in the PARAMS supplier
