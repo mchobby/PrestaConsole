@@ -1519,10 +1519,15 @@ class BaseProductList( BaseDataList ):
 
 		return ( _product_data.reference, _product_data.name, _product_data.ean13 )
 
-	def search_products_from_partialref( self, sPartialRef ):
+	def search_products_from_partialref( self, sPartialRef, include_inactives = False ):
 		""" Find an active product from a partial reference """
 		_result = []
 		_sToFind = canonical_search_string( sPartialRef )
+		if include_inactives:
+			for item in self.inactivelist:
+				sProductRef = item.canonical_reference()
+				if sProductRef.find( _sToFind )>=0 :
+					_result.append( item )
 		for item in self:
 			sProductRef = item.canonical_reference()
 			if sProductRef.find( _sToFind )>=0 :

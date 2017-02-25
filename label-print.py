@@ -59,7 +59,7 @@ def list_products( cachedphelper, key ):
 		print( 'searching product requires at least 3 characters' )
 		return
 	
-	result = cachedphelper.products.search_products_from_partialref( key )
+	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
 	for item in result:
 		print( '%7i : %s - %s' % (item.id,item.reference.ljust(20),item.name) )
 		
