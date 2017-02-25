@@ -61,7 +61,7 @@ def list_products( cachedphelper, key ):
 	
 	result = cachedphelper.products.search_products_from_partialref( key )
 	for item in result:
-		print( '%4i : %s - %s' % (item.id,item.reference.ljust(20),item.name) )
+		print( '%7i : %s - %s' % (item.id,item.reference.ljust(20),item.name) )
 		
 def get_product_params_dic( cachedpHelper,id_product ):
 	""" Locate the product parameter stored in the PARAMS supplier
@@ -497,6 +497,22 @@ def product_id_to_ean13():
 	product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 	print( 'Ean13: %s' % product_ean )
 		
+def product_combination_to_ean13():
+	""" Create an ean13 from the mchobby product id + combination id """
+	value = raw_input( 'Product ID: ' )
+	if not( value.isdigit() ):
+		print 'Product ID can only have digits!' 
+		return
+
+	value2 = raw_input( 'Combination ID: ' )
+	if not( value2.isdigit() ):
+		print 'Combination ID can only have digits!' 
+		return
+
+	product_ean = '32322%02i%05i' % (int(value2),int(value)) # prefix 3232 + combination 2 + id_combination + id_product
+	product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
+	print( 'Ean13: %s' % product_ean )
+
 def ondemand_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
 	lines = [] 
@@ -647,11 +663,11 @@ def main():
 		print( '='*40 )
 		print( '  +r : reload cache           | +s          : save cache' )
 		print( '  +12: ean12 to ean13         | +e          : create ean13' )
-		print( '  id : id product to print    | partial_code: to search' )
+		print( '  id : id product to print    | +f          : create comb. ean13' )
 		print( '  +ol: On demand label (Large)| +al         : address label' )
 		print( '  +os: On demand label (Short)| +openl      : open for... label' )
 		print( '  +ok: On demand label (King) | +w          : Warranty')
-		print( '                              | +vat        : vat intracom text' )
+		print( '  partial_code: to search     | +vat        : vat intracom text' )
 		print( '  +q : quit ' )
 		print( '='*40 )
 		print( '' )
@@ -670,6 +686,8 @@ def main():
 			ean12_to_ean13()
 		elif value == '+e':
 			product_id_to_ean13()
+		elif value == '+f':
+			product_combination_to_ean13()
 		elif value == '+ol': #On_demand Large label
 			ondemand_label_large()
 		elif value == '+os': #On_demand Short label

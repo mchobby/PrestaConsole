@@ -67,6 +67,8 @@ def coalesce(*a):
     
 def canonical_search_string( sText ):
 	"""Return the essential elements for text searching """
+	if sText == None:
+		return ''
 	__s = sText.replace( ' ', '' )
 	__s = __s.replace( '.', '' );
 	__s = __s.replace( '-', '' );
@@ -182,12 +184,18 @@ class PrestaHelper(object):
 		
 	def get_products( self ):
 		""" retreive a list of products from PrestaShop """
+		# combinations are used to create the various "declinaisons" of a single product
+		logging.debug( 'read combinations' )
+		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13]' } )
+		_combinations = CombinationList( self )
+		_combinations.load_from_xml( el )
+
 		logging.debug( 'read products' )
 		#el = self.__prestashop.search( 'products' )
 		#print( ElementTree.tostring( el ) )
 		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13]'} )
 		
-		_result = BaseProductList( self )
+		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
 		_result.load_from_xml( el )
 		
 		return _result
@@ -1145,6 +1153,41 @@ class OrderStateList( BaseDataList ):
 			kind of user management (like preparing, boxing, shipping, etc) """
 		return self.is_paid( order_state ) and not(self.is_sent( order_state ))
 
+class CombinationData( BaseData ):
+	""" Contains the Combination of a product... the various "colors" of a single product.
+		Each having a reference or an ean13 
+
+	Fields:
+		id(int) - ID of the combination
+		id_product(int) - related product ID
+		reference(str)  - reference of the product (ex:FEATHER-CASE-TFT-WHITE)
+		ean13(str)      - ean13 if available
+		
+	Remarks: directly loaded from the CombinationList class"""
+
+	__slots__ = ["id", "id_product", "reference", "ean13"]
+
+	def load_from_xml( self, node ):
+		""" Initialise the data from a combination """
+		pass
+
+	def __getstate__(self):
+		""" return the object state for pickeling """
+		return {"id":self.id, "id_product" : self.id_product, "reference" : self.reference, "ean13" : self.ean13 }
+
+	def __setstate__(self,dic):
+		""" Set the object state from unpickeling """
+		self.id             = dic['id'] 
+		self.id_product     = dic['id_product']
+		self.reference      = dic['reference']
+		self.ean13 			= dic['ean13']
+
+	def canonical_reference( self ):
+		""" Return the canonical search string of the reference. 
+			Allow a better search algorithm """
+			
+		return canonical_search_string( self.reference )
+
 class ProductData( BaseData ):
 	""" Constains the data of an product.
 	
@@ -1303,21 +1346,63 @@ class StockAvailableList( BaseDataList ):
 			else:
 				stock_obj.quantity = int( __item['quantity'] )
 		return
-		
+	
+class CombinationList( BaseDataList ):
+	""" List of product combination """
+
+	def load_from_xml( self, node ):
+		items = etree_to_dict( node )
+		#print( items )
+		items = items['prestashop']['combinations']['combination']
+		for item in items:
+			# print( item )
+			_data = CombinationData( self.helper )
+			_data.id         = int( item['id'] )
+			_data.id_product = int( item['id_product']['#text'] )
+			_data.reference  = item['reference'] if item['reference']!= None else ''
+			_data.ean13      = item['ean13'] if item['ean13']!=None else '' 
+			# Auto-switch from EAN12 to EAN13
+			# Damned PrestaShop accept EAN12 instead of ean13!?!?
+			if len(_data.ean13) == 12:
+				_data.ean13 = calculate_ean13( _data.ean13 )
+			self.append( _data )
+
+	def has_combination( self, id_product ):
+		""" Check if it exists a combination for an id_product """
+		for item in self:
+			if item.id_product == id_product:
+				return True
+		return False
+
+	def get_combinations( self, id_product ):
+		""" Return the combinations for an id_product or None """
+		_r = [item for item in self if item.id_product == id_product ]
+		return None if len(_r)==0 else _r
+
+	def recompute_id_product( self, id_product, id_combination ):
+		return id_combination*100000+id_product
+
+
 class BaseProductList( BaseDataList ):
 	""" List of product. Base class that can be derivated """
 
 	# used to store inactive objects
 	inactivelist = [] 
+	combinationlist = None
+
+	def __init__( self, owner, combinationlist=None ):
+		""" the owner is the PrestaHelper instance which create the 
+			data objects, the combinationlist may provided from previous load ) 
+		"""
+		super(BaseProductList,self).__init__(owner)
+		self.combinationlist = combinationlist
 	
 	def load_from_xml( self, node ):
 		""" Load the Product list with data comming from prestashop search.
 			Must contains nodes: id, name, active, ... """
-		items = etree_to_dict( node )
-		#print( items )
-		items = items['prestashop']['products']['product']
-		for item in items:
-			# print( item )
+
+		def create_from_item( item ):
+			""" Init a ProductData from item dictionnary """
 			_data = ProductData( self.helper )
 			_data.active   = int( item['active'] )
 			_data.id       = int( item['id'] )
@@ -1339,11 +1424,33 @@ class BaseProductList( BaseDataList ):
 				self.inactivelist.append( _data )
 			else:
 				self.append( _data )
-			_data.ean13 = item['ean13'] if item['ean13']!=None else '' 
-			# Auto-switch from EAN12 to EAN13
-			# Damned PrestaShop accept EAN12 instead of ean13!?!?
-			if len(_data.ean13) == 12:
-				_data.ean13 = calculate_ean13( _data.ean13 ) 
+			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
+			return _data
+
+
+		items = etree_to_dict( node )
+		#print( items )
+		items = items['prestashop']['products']['product']
+		for item in items:
+			# print( item )
+			id_product = int(item['id'])
+			if not self.has_combination( id_product ):
+				_data = create_from_item( item ) # create the object from dict of data.
+
+				# Auto-switch from EAN12 to EAN13
+				# Damned PrestaShop accept EAN12 instead of ean13!?!?
+				if len(_data.ean13) == 12:
+					_data.ean13 = calculate_ean13( _data.ean13 ) 
+			else:
+				# Product HAS COMBINATION --> so create a product entry for each item
+				_combinations = self.get_combinations( id_product )
+				for _combination in _combinations:
+					_data = create_from_item( item )
+					_data.reference = _combination.reference
+					_data.ean13     = _combination.ean13
+					# recompute an unique id_product (1 for 99.999 products) 
+					_data.id        = self.combinationlist.recompute_id_product( _combination.id_product, _combination.id )
+
 
 	def pickle_data( self, fh ):
 		""" organize the pickeling of data 
@@ -1352,7 +1459,11 @@ class BaseProductList( BaseDataList ):
 			fh - file handler to dump the data
 		"""
 		BaseDataList.pickle_data( self, fh )
+		# Save the inactive list
 		pickle.dump( list(self.inactivelist), fh )
+		# Save the combination list
+		pickle.dump( True if self.combinationlist else False, fh )
+		pickle.dump( list(self.combinationlist), fh )
 		
 	def unpickle_data( self, fh ):
 		""" unpickeling the data
@@ -1368,27 +1479,45 @@ class BaseProductList( BaseDataList ):
 			# reassign the helper
 			item.helper = self.helper
 			# register to the list
-			self.inactivelist.append( item ) 
+			self.inactivelist.append( item )
 
-	def product_from_id( self, Id ):
+		# Load the combination list
+		aBoolean = pickle.load( fh )
+		if aBoolean:
+			self.combinationlist = pickle.load( fh )
+			for item in self.combinationlist:
+				# reassign the helper
+				item.helper = self.helper
+		else:
+			aBoolean.combinationlist = None
+
+	def has_combination( self, id_product ):
+		return self.combinationlist and self.combinationlist.has_combination( id_product ) 
+
+	def get_combinations( self, id_product ):
+		if not self.combinationlist:
+			return None
+		return self.combinationlist.get_combinations( id_product )
+
+
+	def product_from_id( self, id_product ):
 		""" Return the ProductData object from product ID """
-		pass
 		for item in self:
-			if item.id == Id:
+			if item.id == id_product:
 				return item
 		for item in self.inactivelist:
-			if item.id == Id:
+			if item.id == id_product:
 				return item
 		return None
 		
-	def productinfo_from_id( self, Id ):
+	def productinfo_from_id( self, id_product ):
 		""" Return a tuple with the  ProductData.reference and
 		ProductData.name from the product ID """
-		pass
-		_product_data = self.product_from_id( Id )
+		_product_data = self.product_from_id( id_product )
 		if _product_data == None:
-			return ('?%i?'%(Id),'undefined')
-		return (_product_data.reference, _product_data.name )
+			return ('?%i?'%(Id), 'undefined', '')
+
+		return ( _product_data.reference, _product_data.name, _product_data.ean13 )
 
 	def search_products_from_partialref( self, sPartialRef ):
 		""" Find an active product from a partial reference """
