@@ -458,7 +458,7 @@ def print_ondemand_label_short( label_title, label_lines, qty ):
 	# Write a BarCode field
 	#   Change d.font('E') to d.font('T',17,8 )
 	d.field( origin=(40,11), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[:24] ) )
-	d.field( origin=(40,42), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[24:] ) )
+	d.field( origin=(40,45), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[24:] ) )
 	top = 95
 	for line in label_lines:
 		d.field( origin=(40, top), font=d.font('C'), data=line )

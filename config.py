@@ -10,6 +10,7 @@ CONFIG_SECTION_PRESTAAPI = 'PRESTA-API'
 CONFIG_SECTION_DEBUG = 'DEBUG'
 CONFIG_SECTION_LCD = 'LCD-DISPLAY'
 CONFIG_SECTION_COMPANY = 'COMPANY'
+CONFIG_SECTION_TOTE_BAG= 'TOTE-BAG'
 
 # Keynames for section PRESTA-API
 CONFIG_KEY_KEY = 'key'
@@ -28,6 +29,9 @@ CONFIG_KEY_VAT   = 'vat'
 CONFIG_KEY_PHONE = 'phone'
 CONFIG_KEY_WEB   = 'web'
 
+# Tote Bag
+CONFIG_KEY_EXPORT_PATH = 'export_path'
+
 class Config(object):
 	"""read paramters from the "config.ini" configuration file"""
 	_presta_api_key = 'None'
@@ -40,6 +44,8 @@ class Config(object):
 	_company_vat = ''
 	_company_phone = ''
 	_company_web = ''
+
+	_tote_bag_export_path = ''
 	
 	def __init__( self ):
 		config = ConfigParser()
@@ -79,7 +85,10 @@ class Config(object):
 			self._company_url = config.get( CONFIG_SECTION_COMPANY, CONFIG_KEY_WEB )
 		except:
 			pass
-			
+		try:
+			self._tote_bag_export_path = config.get( CONFIG_SECTION_TOTE_BAG, CONFIG_KEY_EXPORT_PATH )
+		except:
+			pass			
 	@property
 	def presta_api_key( self ):
 		""" Access key to the PrestaShop API - must be generated in the 
@@ -121,3 +130,8 @@ class Config(object):
 	@property 
 	def company_url( self ):
 		return self._company_url
+
+	@property
+	def tote_bag_export_path(self):
+	    return self._tote_bag_export_path
+	

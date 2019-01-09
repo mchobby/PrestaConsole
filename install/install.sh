@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+sudo apt-get install python-cups
 
 pip install --user setuptools
 pip install --user httplib2
@@ -16,7 +17,10 @@ ln -s ./../PythonPcl/pypcl pypcl
 if [ -e ~/python/PrestaConsole/config.ini ]; then
     echo "Config file available"
 else
-    echo "CONFIG FILE MISSING"
+    echo "----------------------------------------------"
+    echo "            CONFIG FILE MISSING !"
     echo "please edit ~/python/PrestaConsole/config.ini"
+    echo "----------------------------------------------"
+    cp config.sample config.ini
 fi
 
