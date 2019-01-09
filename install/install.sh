@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 sudo apt-get install python-cups
+sudo apt-get install python-tk
 
 pip install --user setuptools
 pip install --user httplib2
