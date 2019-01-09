@@ -13,7 +13,7 @@ git clone https://github.com/mchobby/PrestaConsole.git
 cd PrestaConsole
 ln -s ./../lcdmtrx lcdmtrx
 ln -s ./../PythonPcl/pypcl pypcl
-if [ -e ~/python/PrestaConsole/config.ini ]
+if [ -e ~/python/PrestaConsole/config.ini ]; then
     echo "Config file available"
 else
     echo "CONFIG FILE MISSING"
