@@ -456,11 +456,12 @@ def print_ondemand_label_short( label_title, label_lines, qty ):
 		d.print_quantity( qty )
 
 	# Write a BarCode field
-	d.field( origin=(120,11), font=d.font('E'), data= unicode( label_title.ljust(20)[:10] ) )
-	d.field( origin=(120,42), font=d.font('E'), data= unicode( label_title.ljust(20)[10:] ) )
-	top = 75
+	#   Change d.font('E') to d.font('T',17,8 )
+	d.field( origin=(40,11), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[:24] ) )
+	d.field( origin=(40,42), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[24:] ) )
+	top = 95
 	for line in label_lines:
-		d.field( origin=(98, top), font=d.font('C'), data=line )
+		d.field( origin=(40, top), font=d.font('C'), data=line )
 		top = top + 25
 	
 	# End Print format
@@ -517,12 +518,15 @@ def ondemand_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
 	lines = [] 
 	title = 'My onDemand label test!' # Title cannot be unicode
+	_size = 'large'
 	 
 	title = raw_input( 'Title (sans accent) or +q: ' )
 	if title == '+q': # user abord
 		return
 	
-	print( 'Key in the lines (6 lines max, +q to quit, empty to proceed)' )
+	print( 'Key in the lines (6 lines max):' )
+	print( '  +q to quit'        ) 
+	print( '  empty to proceed)' )
 	iLine = 0
 	while True:
 		iLine += 1
@@ -530,7 +534,7 @@ def ondemand_label_large():
 		if len( aLine ) == 0:
 			break
 		if aLine == '+q': # User abord
-			return  
+			return 
 		
 		# Decode the line otherwise the unicode quest an ascii string
 		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
