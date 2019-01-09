@@ -17,6 +17,6 @@ if [ -e ~/python/PrestaConsole/config.ini ]; then
     echo "Config file available"
 else
     echo "CONFIG FILE MISSING"
-    echo "please edit ~/python/PrestaConsole/config.ini
+    echo "please edit ~/python/PrestaConsole/config.ini"
 fi
 
