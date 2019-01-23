@@ -39,6 +39,30 @@ def etree_to_dict(t):
             d[t.tag] = text
     return d
 
+def extract_hashtext( item, default_lang_id='2' ):
+	""" Extract the #text from the provided item (eg: item = items[i]['name'] ).
+		Take care about monolingual & multilingual configuration
+
+		ON MONOLINGUAL system : the label can be extracted with item['language']['#text'] 
+
+		ON MULTILINGUAL system : the label is stored into a list a dictionnary.
+		eg: item['language'] will be a list of dict 
+               [ {'#text': "En attente d'autorisation",
+                   '@id': '1',
+                   '@{http://www.w3.org/1999/xlink}href': 'https://shop.mchobby.be/api/languages/1'},
+                 {'#text': "En attente d'autorisation",
+                   '@id': '2',
+                   '@{http://www.w3.org/1999/xlink}href': 'https://shop.mchobby.be/api/languages/2'}
+               ]
+	"""
+	if isinstance( item['language'] , list ):
+		# extract multilingual 
+		for label_dic in item['language']:
+			if label_dic['@id'] == default_lang_id:
+				return label_dic['#text']
+	else:
+		return item['language']['#text']
+
 def ean13_checksum(ean_base):
 	"""Calculates the checksum for EAN13-Code.
 	   special thanks to python-barcode
@@ -73,6 +97,7 @@ def canonical_search_string( sText ):
 	__s = __s.replace( '.', '' );
 	__s = __s.replace( '-', '' );
 	return __s.upper()
+
 	
 class PrestaHelper(object): 
 	"""Helper class to obtain structured information from 
@@ -219,6 +244,14 @@ class PrestaHelper(object):
 		_result.load_from_xml( el )
 		
 		return _result
+
+	def get_languages( self ):
+		""" retreive the list of languages """
+		logging.debug('read languages')
+		el = self.__prestashop.search( 'languages', options = {'display': '[id,name,iso_code,language_code,active]'}  ) 
+		# also: is_rtl, date_format_lite, date_format_full
+		_result = LanguageList( self )
+		_result.load_from_xml( el )
 		
 	def get_order_states( self ):
 		""" Retreive the list of Order States (OrderStateDate) from prestashop """
@@ -431,6 +464,9 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__stock_available_list = self.get_stockavailables()
 		self.fireProgress( 7, __MAX_STEP, 'Caching Product Suppliers...' )
 		self.__product_supplier_list = self.get_product_suppliers()
+		self.fireProgress( 8, __MAX_STEP, 'Caching languages...' )
+		self.__language_list = self.get_languages()
+
 		
 		# Closing progress
 		self.fireProgress( -1, __MAX_STEP, 'Done' ) # -1 for hidding
@@ -551,6 +587,7 @@ class BaseData( object ):
 		prestaShop WebService
 		"""
 		pass
+
 		
 class BaseDataList( list ):
 	""" Base class to register list of BaseData object """
@@ -587,6 +624,77 @@ class BaseDataList( list ):
 			item.helper = self.helper
 			# register to the list
 			self.add_data_object( item ) 
+
+class LanguageData( BaseData ):
+	""" Contains a langage definition """
+	__slots__ = [ "id", "name", "iso_code", "language_code", "active" ]
+
+	def load_from_xml( self, node ):
+		items = etree_to_dict( node )
+		lng = items['prestashop']['language']
+		self.id       = int( lng['id'] )          # 1, 2, 8
+		self.name     = lng['name']
+		self.iso_code = lng['iso_code']           # en, fr, nl
+		self.language_code = lng['language_code'] # en-us, fr-fr, nl-nl
+		self.active   = int( lng['active'] )
+
+class LanguageList( BaseDataList ):
+	""" List of Languages """
+	
+	def load_from_xml( self, node ):
+		""" Load the language list with data comming from prestashop search.
+			Must contains nodes: id, name """
+
+		items = etree_to_dict( node )
+		items = items['prestashop']['languages']['language']
+		for item in items:
+			_data = LanguageData( self.helper )
+			_data.id       = int( item['id'] )
+			_data.name     = item['name']
+			_data.iso_code = item['iso_code'] 
+			_data.language_code = item['language_code'] # en-us
+			_data.active   = int( item['active'] )
+
+			self.append( _data )
+
+	def pickle_data( self, fh ):
+		""" organize the pickeling of data 
+		
+		Parameters:
+			fh - file handler to dump the data
+		"""
+		BaseDataList.pickle_data( self, fh )
+		
+	def unpickle_data( self, fh ):
+		""" unpickeling the data
+		
+		Parameter:
+			fh - file handler to read the data
+		"""
+		BaseDataList.unpickle_data( self, fh )
+		
+		
+	def language_from_id( self, Id ):
+		""" Return the LanguageData object from Language ID """
+		for item in self:
+			if item.id == Id:
+				return item
+		return None
+
+	def language_from_iso_code( self, iso_code ):
+		""" Return the LanguageData object from Language iso_code (en, fr, nl) """
+		iso_code = iso_code.lower()
+		for item in self:
+			if item.iso_code == iso_code:
+				return item
+		return None
+		
+	def name_from_id( self, Id ):
+		""" Return the LanguageData.name from the Language ID """
+		_language_data = self.language_from_id( Id )
+		if language_data == None:
+			return ''
+		return _language_data.name		
 
 class OrderData( BaseData ):
 	""" Constains the data of an order. 
@@ -976,7 +1084,7 @@ class CategoryList( BaseDataList ):
 			_data = CategoryData( self.helper )
 			_data.active  = int( item['active'] )
 			_data.id      = int( item['id'] )
-			_data.name    = item['name']['language']['#text']
+			_data.name    = extract_hashtext( item['name'] ) # ['language']['#text']
 			_data.level_depth = int( item['level_depth'] )
 			_data.is_root_category = int( item['is_root_category'] )
 			if _data.active == 0:
@@ -1071,7 +1179,7 @@ class OrderStateList( BaseDataList ):
 	PAID_ORDER_STATES = [ ORDER_STATE_PAID, ORDER_STATE_PREPARING, ORDER_STATE_SHIPPING, ORDER_STATE_SHIPPED, ORDER_STATE_REPLENISH ] 
 	WAIT_PAYMENT_ORDER_STATES = [ ORDER_STATE_WAIT_CHEQUE, ORDER_STATE_WAIT_PAYPAL, ORDER_STATE_WAIT_BANKWIRE ]
 	CARRIER_ORDER_STATES = [ ORDER_STATE_SHIPPING, ORDER_STATE_SHIPPED ] # States where the order is currently shipping or shipped	
-		
+
 	def load_from_xml( self, node ):
 		""" Load the Order State list with data comming from prestashop search.
 			Must contains nodes: id, unremovable , send_email ,invoice , shipped , paid, deleted, name """
@@ -1088,7 +1196,7 @@ class OrderStateList( BaseDataList ):
 			_data.deleted     = int( item['deleted'] )
 			_data.id          = int( item['id'] )
 			#print( item )
-			_data.name        = item['name']['language']['#text']
+			_data.name        = extract_hashtext( item['name'] ) 
 			if _data.deleted == 1:
 				self.deletedlist.append( _data )
 			else:
@@ -1416,7 +1524,7 @@ class BaseProductList( BaseDataList ):
 			_data.id_category_default = int( item['id_category_default']['#text'] )
 			_data.available_for_order = int( item['available_for_order'] )
 			_data.advanced_stock_management = int( item['advanced_stock_management'] )
-			_data.name     = item['name']['language']['#text']
+			_data.name     = extract_hashtext( item['name'] ) # ['language']['#text']
 			_data.reference= item['reference'] 
 			_data.wholesale_price = float( item['wholesale_price'] )
 			if isinstance( item['id_supplier'], str ): # Not a valid reference
