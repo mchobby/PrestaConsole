@@ -464,8 +464,9 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__stock_available_list = self.get_stockavailables()
 		self.fireProgress( 7, __MAX_STEP, 'Caching Product Suppliers...' )
 		self.__product_supplier_list = self.get_product_suppliers()
-		self.fireProgress( 8, __MAX_STEP, 'Caching languages...' )
-		self.__language_list = self.get_languages()
+		# Languages are not pickled yet
+		# self.fireProgress( 8, __MAX_STEP, 'Caching languages...' )
+		# self.__language_list = self.get_languages()
 
 		
 		# Closing progress
