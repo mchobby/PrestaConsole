@@ -415,6 +415,28 @@ class PrestaProgressEvent( object ):
 		""" A progress Bar is finished when current step < 0 :-) """
 		self.current_step = -1 
 		 
+class ProductSearchResult( object ):
+
+	def __init__( self, product_data ):
+		self._product_data = product_data
+		self._product_suppliers = []
+
+	@property
+	def product_data( self ):
+		return self._product_data
+
+	@property
+	def product_suppliers( self ):
+		return self._product_suppliers
+
+	@property
+	def supplier_refs( self ):
+		""" Return a concatenated string of supplier refs """
+		return ", ".join( [ps.reference for ps in self._product_suppliers] )
+
+	def add_product_suppliers( self, product_suppliers ):
+		self._product_suppliers += product_suppliers
+
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
 	CACHE_FILE_VERSION = 3
@@ -537,6 +559,39 @@ class CachedPrestaHelper( PrestaHelper ):
 		e = PrestaProgressEvent( currentStep, maxStep, message )
 		# fire event
 		self.progressCallback( e )
+
+	def search_products_from_partialref(  self, sPartialRef, include_inactives = False ):
+		""" Find an active product from a partial reference """
+		_products = self.__product_list.search_products_from_partialref( sPartialRef, include_inactives )
+		_result = []
+		for product in _products:
+			psr = ProductSearchResult( product )
+			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
+			_result.append( psr )
+		return _result
+
+	def search_products_from_label(  self, sPartial ):
+		""" Find an active product from a partial label """
+		_products = self.__product_list.search_products_from_label( sPartial )
+		_result = []
+		for product in _products:
+			psr = ProductSearchResult( product )
+			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
+			_result.append( psr )
+		return _result 
+
+	def search_products_from_supplier_ref( self, sPartialRef ):
+		""" Find an active product having the mentionned supplier reference """
+		product_suppliers = self.__product_supplier_list.search_for_partialref( sPartialRef )
+		_result = []
+		for product_supplier in product_suppliers:
+			_p = self.__product_list.product_from_id( product_supplier.id_product )
+			if _p:
+				psr=ProductSearchResult( _p )
+				psr.product_suppliers.append( product_supplier )
+				_result.append( psr )
+		return _result 
+
 		
 	@property
 	def carriers( self ):
@@ -1050,6 +1105,19 @@ class ProductSupplierList( BaseDataList ):
 				return item.reference
 				
 		return '' # No reference found for the specified ID_Supplier
+
+	def search_for_partialref( self, partialref ):
+		""" Search (not case sensitive) for entries having the partielref in their reference. 
+
+		:param partialref: The partial reference to search for.
+		:returns: list of ProductSupplier. """
+		_result = []
+		partialref = partialref.upper()
+		for item in self:
+			if item.reference and  (partialref in item.reference.upper()):
+				_result.append( item )
+		return _result
+
 	
 class CategoryData( BaseData ):
 	""" Contains the Carriers data """
@@ -1646,12 +1714,22 @@ class BaseProductList( BaseDataList ):
 				sProductRef = item.canonical_reference()
 				if sProductRef.find( _sToFind )>=0 :
 					_result.append( item )
-					print( "match")
+					#print( "match")
 		for item in self:
 			sProductRef = item.canonical_reference()
 			if sProductRef.find( _sToFind )>=0 :
 				_result.append( item )
 		return _result
+
+	def search_products_from_label( self, sPartial ):
+		""" Find products based on the label """
+		sPartial = sPartial.upper()
+		_result = []
+		for item in self:
+			if sPartial in item.name.upper():
+				_result.append( item )
+		return _result
+
 
 	def search_products_for_ean( self, sEan ):
 		""" Find an active product from a partial reference """

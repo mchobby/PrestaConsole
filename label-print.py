@@ -59,9 +59,18 @@ def list_products( cachedphelper, key ):
 		print( 'searching product requires at least 3 characters' )
 		return
 	
-	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
-	for item in result:
-		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
+	if key[0] == '/':  # search on Supplier Ref
+		result = cachedphelper.search_products_from_supplier_ref( key[1:] ) # Skip the /
+	elif key[0] == '*': # search on label
+		result = cachedphelper.search_products_from_label( key[1:] ) # Skip the *
+	else:
+		result = cachedphelper.search_products_from_partialref( key, include_inactives = True )
+	
+
+
+	for psr in result: # Returns a list of ProductSearchResult
+		print( '%7i : %s - %s - %s' % (psr.product_data.id, psr.product_data.reference.ljust(30), \
+			psr.product_data.name.ljust(50), psr.supplier_refs ) )
 		
 def get_product_params_dic( cachedpHelper,id_product ):
 	""" Locate the product parameter stored in the PARAMS supplier
@@ -618,7 +627,23 @@ def ondemand_label_short():
 		qty = 25
 		
 	print_ondemand_label_short( title, lines, qty )
-	
+
+def show_help():
+	print( '='*40 )
+	print( '  +r : reload cache           | +s          : save cache' )
+	print( '  +12: ean12 to ean13         | +e          : create ean13' )
+	print( '  id : id product to print    | +f          : create comb. ean13' )
+	print( '  +ol: On demand label (Large)| +al         : address label' )
+	print( '  +os: On demand label (Short)| +openl      : open for... label' )
+	print( '  +ok: On demand label (King) | +w          : Warranty')
+	print( '  partial_code  : to search   | +vat        : vat intracom text' )
+	print( '  /supplier-red : to search   | ' )
+	print( '  *product-label: to search   | ' )
+	print( ' ')
+	print( '  +h : help ' )
+	print( '  +q : quit ' )
+	print( '='*40 )
+
 def main():
 	def progressHandler( prestaProgressEvent ):
 		if prestaProgressEvent.is_finished:
@@ -661,20 +686,11 @@ def main():
 	#print('mise à jour des qty' )
 	#cachedphelper.stock_availables.update_quantities()
 	#print( 'Voila, c est fait' )
+	show_help()
 	
 	value = ''
 	while value != '+q':
-		print( '='*40 )
-		print( '  +r : reload cache           | +s          : save cache' )
-		print( '  +12: ean12 to ean13         | +e          : create ean13' )
-		print( '  id : id product to print    | +f          : create comb. ean13' )
-		print( '  +ol: On demand label (Large)| +al         : address label' )
-		print( '  +os: On demand label (Short)| +openl      : open for... label' )
-		print( '  +ok: On demand label (King) | +w          : Warranty')
-		print( '  partial_code: to search     | +vat        : vat intracom text' )
-		print( '  +q : quit ' )
-		print( '='*40 )
-		print( '' )
+		print( '-'*40 )
 		value = raw_input( 'What to do: ' )
 		
 		if value == '+q':
