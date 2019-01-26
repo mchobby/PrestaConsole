@@ -708,6 +708,8 @@ def main():
 			product_id_to_ean13()
 		elif value == '+f':
 			product_combination_to_ean13()
+		elif value == '+h':
+			show_help()
 		elif value == '+ol': #On_demand Large label
 			ondemand_label_large()
 		elif value == '+os': #On_demand Short label
