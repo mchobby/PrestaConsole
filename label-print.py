@@ -69,8 +69,12 @@ def list_products( cachedphelper, key ):
 
 
 	for psr in result: # Returns a list of ProductSearchResult
-		print( '%7i : %s - %s - %s' % (psr.product_data.id, psr.product_data.reference.ljust(30), \
-			psr.product_data.name.ljust(50), psr.supplier_refs ) )
+		print( '%7i : %s : %5i : - %s - %s' % ( \
+			psr.product_data.id, \
+			psr.product_data.reference.ljust(30), \
+			psr.qty, \
+			psr.product_data.name.ljust(50), \
+			psr.supplier_refs ) )
 		
 def get_product_params_dic( cachedpHelper,id_product ):
 	""" Locate the product parameter stored in the PARAMS supplier
@@ -631,14 +635,14 @@ def ondemand_label_short():
 def show_help():
 	print( '='*40 )
 	print( '  +r : reload cache           | +s          : save cache' )
-	print( '  +12: ean12 to ean13         | +e          : create ean13' )
+	print( '  +e          : create ean13  | +u          : REFRESH STOCK' )
 	print( '  id : id product to print    | +f          : create comb. ean13' )
 	print( '  +ol: On demand label (Large)| +al         : address label' )
 	print( '  +os: On demand label (Short)| +openl      : open for... label' )
 	print( '  +ok: On demand label (King) | +w          : Warranty')
 	print( '  partial_code  : to search   | +vat        : vat intracom text' )
-	print( '  /supplier-red : to search   | ' )
-	print( '  *product-label: to search   | ' )
+	print( '  /supplier-ref : to search   | ' )
+	print( '  *product-label: to search   | +12         : ean12 to ean13' )
 	print( ' ')
 	print( '  +h : help ' )
 	print( '  +q : quit ' )
@@ -702,6 +706,9 @@ def main():
 		elif value == '+s':
 			print( 'Saving cache...' )
 			cachedphelper.save_cache_file()
+		elif value == '+u':
+			print( 'Refreshing stock quantities...' )
+			cachedphelper.refresh_stock()
 		elif value == '+12':
 			ean12_to_ean13()
 		elif value == '+e':

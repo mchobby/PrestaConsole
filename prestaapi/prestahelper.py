@@ -420,13 +420,27 @@ class ProductSearchResult( object ):
 	def __init__( self, product_data ):
 		self._product_data = product_data
 		self._product_suppliers = []
+		self._qty = 0
 
 	@property
 	def product_data( self ):
+		""" Product information 
+
+		:remarks: see id_supplier for default product supplier."""
 		return self._product_data
 
 	@property
+	def qty(self):
+		""" Qty available for this quantity """
+		return self._qty
+
+	@qty.setter
+	def qty(self, value):
+	    self._qty = value
+
+	@property
 	def product_suppliers( self ):
+		""" known suppliers for the product """
 		return self._product_suppliers
 
 	@property
@@ -551,6 +565,10 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__product_supplier_list.pickle_data( fh )
 		finally:
 			fh.close()
+
+	def refresh_stock( self ):
+		""" Reload the stock availables """
+		self.__stock_available_list.update_quantities()
 		
 	def fireProgress( self, currentStep, maxStep, message ):
 		if self.progressCallback == None:
@@ -560,6 +578,17 @@ class CachedPrestaHelper( PrestaHelper ):
 		# fire event
 		self.progressCallback( e )
 
+	def __update_search_product_qty( self, _list ):
+		""" Browse the _list  and update the quantity for the article 
+
+		   :param _list: list of ProductSearchResult to be updated """
+		for psr in _list:
+			_sa = self.stock_availables.stockavailable_from_id_product( psr.product_data.id )
+			if _sa:
+				psr.qty = _sa.quantity
+			else:
+				psr.qty = -999
+
 	def search_products_from_partialref(  self, sPartialRef, include_inactives = False ):
 		""" Find an active product from a partial reference """
 		_products = self.__product_list.search_products_from_partialref( sPartialRef, include_inactives )
@@ -568,6 +597,7 @@ class CachedPrestaHelper( PrestaHelper ):
 			psr = ProductSearchResult( product )
 			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
 			_result.append( psr )
+		self.__update_search_product_qty( _result )
 		return _result
 
 	def search_products_from_label(  self, sPartial ):
@@ -578,6 +608,7 @@ class CachedPrestaHelper( PrestaHelper ):
 			psr = ProductSearchResult( product )
 			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
 			_result.append( psr )
+		self.__update_search_product_qty( _result )
 		return _result 
 
 	def search_products_from_supplier_ref( self, sPartialRef ):
@@ -590,6 +621,7 @@ class CachedPrestaHelper( PrestaHelper ):
 				psr=ProductSearchResult( _p )
 				psr.product_suppliers.append( product_supplier )
 				_result.append( psr )
+		self.__update_search_product_qty( _result )
 		return _result 
 
 		
