@@ -114,7 +114,17 @@ class PrestaHelper(object):
 		logging.info( 'connecting Presta API @ %s...', (presta_api_url) )	
 		self.__prestashop = PrestaShopWebService( presta_api_url, presta_api_key )
 
+		self.__debug = debug
 		self.__prestashop.debug = debug
+
+	@property 
+	def debug( self ):
+		return self.__debug
+
+	@debug.setter
+	def debug( self, value ):
+		self.__debug = value
+		self.__prestashop.debug = value
 		
 	def search( self, pattern, options ):
 		""" Giving access to search capability of underlaying PrestaShop WebService """
@@ -600,9 +610,9 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__update_search_product_qty( _result )
 		return _result
 
-	def search_products_from_label(  self, sPartial ):
+	def search_products_from_label(  self, sPartial, include_inactives = False ):
 		""" Find an active product from a partial label """
-		_products = self.__product_list.search_products_from_label( sPartial )
+		_products = self.__product_list.search_products_from_label( sPartial, include_inactives )
 		_result = []
 		for product in _products:
 			psr = ProductSearchResult( product )
@@ -611,7 +621,7 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__update_search_product_qty( _result )
 		return _result 
 
-	def search_products_from_supplier_ref( self, sPartialRef ):
+	def search_products_from_supplier_ref( self, sPartialRef, include_inactives = False ):
 		""" Find an active product having the mentionned supplier reference """
 		product_suppliers = self.__product_supplier_list.search_for_partialref( sPartialRef )
 		_result = []
@@ -621,6 +631,18 @@ class CachedPrestaHelper( PrestaHelper ):
 				psr=ProductSearchResult( _p )
 				psr.product_suppliers.append( product_supplier )
 				_result.append( psr )
+		self.__update_search_product_qty( _result )
+		return _result 
+
+	def search_products_from_supplier( self, id_supplier, include_inactives = False ):
+		""" Find products for a supplier """
+		_products = self.__product_list.search_products_from_supplier( id_supplier, include_inactives )
+		_result = []
+		for product in _products:
+			psr = ProductSearchResult( product )
+			# find all supplier red anyway
+			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
+			_result.append( psr )
 		self.__update_search_product_qty( _result )
 		return _result 
 
@@ -1093,6 +1115,8 @@ class ProductSupplierList( BaseDataList ):
 			_data.id_product = int( item['id_product']['#text'] )
 			_data.id_supplier = int( item['id_supplier']['#text'] )
 			_data.reference   = item['product_supplier_reference']
+			if _data.reference == None:
+				_data.reference = '' 
 			self.append( _data )
 
 	def pickle_data( self, fh ):
@@ -1457,6 +1481,21 @@ class ProductData( BaseData ):
 			
 		return canonical_search_string( self.reference )
 
+	@property
+	def is_combination( self ):
+		""" Conbination product does have an ID > =100000. Eg: 4501077 for FEATHER-CASE-PROTO-WHITE """
+		return (self.id >= 100000)
+
+	@property
+	def is_IT( self ):
+		""" Check if the product is an [IT] product """
+		return '[IT]' in self.name
+
+	@property
+	def is_INTERNAL( self ):
+		""" Check if the product is an [IT] product """
+		return '[INTERNAL]' in self.name
+
 class StockAvailableData( BaseData ):
 	""" Contains the Stock_Available description data """
 	__slots__ = ["id", "id_product", "depends_on_stock", "out_of_stock", "quantity" ]
@@ -1718,14 +1757,15 @@ class BaseProductList( BaseDataList ):
 		return self.combinationlist.get_combinations( id_product )
 
 
-	def product_from_id( self, id_product ):
+	def product_from_id( self, id_product, include_inactives = True ):
 		""" Return the ProductData object from product ID """
 		for item in self:
 			if item.id == id_product:
 				return item
-		for item in self.inactivelist:
-			if item.id == id_product:
-				return item
+		if include_inactives:
+			for item in self.inactivelist:
+				if item.id == id_product:
+					return item
 		return None
 		
 	def productinfo_from_id( self, id_product ):
@@ -1736,6 +1776,20 @@ class BaseProductList( BaseDataList ):
 			return ('?%i?'%(Id), 'undefined', '')
 
 		return ( _product_data.reference, _product_data.name, _product_data.ean13 )
+
+	def search_products_from_supplier( self, id_supplier, include_inactives = False ):
+		""" Find all the product corresponding to a given supplier """
+		_result = []
+		if include_inactives:
+			for item in self.inactivelist:
+				if item.id_supplier == id_supplier:
+					_result.append( item )
+					#print( "match")		
+		for item in self:
+			if item.id_supplier == id_supplier:
+				_result.append( item )
+		return _result		
+
 
 	def search_products_from_partialref( self, sPartialRef, include_inactives = False ):
 		""" Find an active product from a partial reference """
@@ -1753,10 +1807,15 @@ class BaseProductList( BaseDataList ):
 				_result.append( item )
 		return _result
 
-	def search_products_from_label( self, sPartial ):
+	def search_products_from_label( self, sPartial, include_inactives = False ):
 		""" Find products based on the label """
 		sPartial = sPartial.upper()
 		_result = []
+		if include_inactives:
+			for item in self.inactivelist:
+				if sPartial in item.name.upper():
+					_result.append( item )
+					#print( "match")		
 		for item in self:
 			if sPartial in item.name.upper():
 				_result.append( item )
@@ -1770,3 +1829,14 @@ class BaseProductList( BaseDataList ):
 			if item.ean13 == sEan:
 				_result.append( item )
 		return _result
+
+	@property
+	def last_id( self ):
+		""" return the last (greatest) product_id registered. Ignore combination product ID (> 100000)"""
+		_result = None
+		for item in self:
+			if item.is_combination:
+				continue 
+			_result = max( _result, item.id )
+		return _result
+

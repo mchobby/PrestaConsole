@@ -1,0 +1,151 @@
+
+CONSOLE - PrestaShop API Console Helper
+
+command.py is basic command interpreter build on the top of PrestaHelpher (prestaapi.py)
+
+Basics :
+--------
+A command is composed of one or many keywords and optional paramters.
+EG: list supplier watt
+
+Paramters are usually enclosed within < > tag when describing a function.
+EG: list supplier <PARAM> 
+
+
+keywords may have have many equivalents. 
+By example, "ls" can be used instead of "list", "prod" or "arti" can be used instead of "product".
+So "ls prod <PARAM>" is the same as "list product <PARAM>"
+
+The keyword equivalence can be find with the command "help keyword <THE_KEYWORD>".
+
+Special use-case :
+-----------------:
+Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command "list product <WORD>" (or /<WORD> or *<WORD>) and will show the results.
+
+If the <WORD> only contains digits then the command is translated to "print product <WORD>" and print the product label.
+
+Quick help :
+------------
+* The command "help" shows the help file.
+* The command "show command" show the list of supported command.
+* The command "show debug" show many information about internal state.
+
+
+HELP Commands :
+===============
+
+help : 
+
+  show this help file
+
+help keyword <PARAM> : 
+
+  show all equivalent keywords of PARAM. 
+  Eg: help keyword list
+
+help command : 
+
+  show a list of all supported commands.
+
+
+GENERAL PURPOSE Commands :
+==========================
+
+ean <ID> :
+
+  Calculate the product EAN13 of <ID> and display it on the console
+
+list product <PARAM> :
+
+  Show the list of product corresponding to <PARAM>.
+  <PARAM> may have multiple possible values:
+  * <TEXT> - List the product with reference containing the TEXT
+  * /<REF> - List the product with SUPPLIER reference containng the REF
+
+
+list supplier :
+list supplier <PARAM> :
+  
+  Show the list of suppliers or filter it on <PARAM> to reduce the list.
+  if <PARAM> is an ID or reduce the list to ONLY ONE supplier 
+  then it show the list of attached products.
+
+
+print product <ID> :
+
+  print label for the product <ID>. Interactive command would allow to 
+  choose the number of labels.
+
+reload :
+
+  Contact the WebShop and reload all the data. Don't forget to save!
+
+
+reload stock :
+
+  Contact the WebShop to ONLY RELOAD the stock quantities
+
+
+save :
+
+  save the current data to the cache file.
+
+
+TUNING Commands :
+=================
+
+show debug :
+  
+  display useful information to help debugging
+
+show stat :
+
+  display the cache statistic
+
+show option <PARAM> :
+show option :
+
+  show mentionned option otherwise all the options
+
+set option <NAME> <VALUE> :
+  
+  modify the option <NAME> (always lowercase, see CONSOLE OPTIONS section) with the mentionned value.
+  Use 1 or 0 for boolean.
+  Use '' for empty string
+
+set debug <VALUE> :
+
+  toggle the debug flag (1/0).
+
+
+
+CONSOLE OPTIONS :
+=================
+Console options can be check with "show option" and "set option".
+option name are ALWAYS lowercase, without space (use - instead).
+Boolean values are 1 or 0.
+
+
+inactive-product     (0 = inactive by default) 
+
+    Includes the inactive products in the product search.
+  
+
+include-it           (0 = inactive by default)
+
+    Include the [IT] products in the product search.
+  
+
+show-product-pa      (1 = ACTIVE by default)
+
+    Include Buying Price in the ourput results.
+
+
+show-product-pv      (1 = ACTIVE by default)
+
+    Include Selling Price in the output result. 
+
+
+show-product-label   (1 = ACTIVE by default)
+
+    Show the product label in the ouput.

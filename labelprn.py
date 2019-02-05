@@ -1,0 +1,541 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+"""labelprn.py
+
+Label Printing Helpers for the Presta Console project
+  
+Copyright 2014 DMeurisse <info@mchobby.be>
+  
+Print Labels on Zebra LP 2824 PLUS via the CUPS "zebra-raw" print queue
+Version alpha
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+  
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+  
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+MA 02110-1301, USA.
+"""  
+
+import logging
+from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
+
+PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
+PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
+PRINTER_ENCODING = 'cp850'
+	
+		
+def handle_print_for_product( product, params ):
+	""" Manage the tickect printing for an ID product.
+		May ask additionnal questions on on input
+
+		:param product: the ProductData object to print
+		:param params: the product parameter dictionnary (extracted from PARAMS supplier)  
+
+		"""
+	# item = cachedphelper.products.product_from_id( id )
+	assert product
+	assert len( product.ean13 )>0 and (product.ean13 != '0'), 'Product must have an EAN13 !' 
+	
+	# Detection de la largeur de l'étiquette dans LS:S (label size=small)	
+	label_size = 'large'
+	if 'LS' in params:
+		if params['LS']=='S':
+			label_size = 'small'
+		else:
+			label_size = 'large'
+		
+	while True:
+		print( 'Label format: %s (+ to change)' % label_size.upper() )
+		value = raw_input( 'How many label for %s: ' % product.reference )
+		if len(value)==0:
+			value = '1'
+		if value=='0':
+			return
+			
+		if value=='+': # change label size
+			label_size = 'large' if label_size == 'small' else 'small'
+			continue 
+		if value=='+q': #user abord
+			return 
+			
+		if not value.isdigit():
+			print( '%s is not a numeric value' % value )
+			return
+		
+		if int(value) > 25:
+			value2 = raw_input( 'Quantity > 25! Please confirm: ' )
+			if not value2.isdigit():
+				print( '%s is not a numeric value, ABORT!' % value2 )
+				return
+			elif int(value2) != int(value):
+				print( 'inconsistant quantities %s & %s' % (value, value2) )
+				return
+				
+		if label_size == 'small':
+			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
+			print_product_label_medium( product.id, product.reference, product.ean13, int(value) )
+		else:
+			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
+			print_product_label_large( product.id, product.reference, product.ean13, int(value) )	 
+		return
+	
+def print_product_label( product_id, product_ref, product_ean, qty ):
+	""" Print the Labels on the Zebra LP 2824 on 1.25" x 1" labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Label is printed with 2 lines of 10 characters
+	l1 = product_ref[:10] 
+	l2 = product_ref[10:]
+	
+	# Write product name
+	#   we will try to offer a human redeable text (2x10 chars) on the  
+	#   label properly cut the text around ' ', '-'
+	iPos = max( l1.rfind( ' ' ), l1.rfind( '-' ) )
+	if iPos == -1 or iPos == 9 or len( product_ref ) <= 10: 
+		# The text too short or not appropriate to cute it.
+        # Just cut it without care.
+		l1 = product_ref.ljust(20)[:10] 
+		l2 = product_ref.ljust(20)[10:]
+	else:
+		iShouldMove = 10 - (iPos+1)
+		if len( l2 )+ iShouldMove <= 10: # if second line would not exceed max len ?
+			# We go for nicely cutting it!
+			l2 = l1[iPos+1:] + l2
+			l1 = l1[:iPos+1] 
+		else:
+			# Keep the cut without care
+			l1 = product_ref.ljust(20)[:10] 
+			l2 = product_ref.ljust(20)[10:]
+			
+	
+	d.field( origin=(120,11), font=d.font('E'), data= unicode( l1 ) )
+	d.field( origin=(120,42), font=d.font('E'), data= unicode( l2 ) )
+	# Write a BarCode field
+	d.ean13( origin=(130,80), ean=unicode(product_ean), height_dots = 50 )
+	
+	d.field( origin=(130,160), font=d.font('C'), data=u'shop.mchobby.be' )
+	d.field( origin=(98,185), font=d.font('C'), data=u'MC Hobby sprl' )
+	
+	d.field( origin=(265,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
+def print_product_label_medium( product_id, product_ref, product_ean, qty ):
+	""" Print the Labels on the Zebra LP 2824 on 50mm large. 2" x 1" labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )			
+	
+	d.field( origin=(25,15), font=d.font('E'), data= unicode( product_ref ) )
+
+	# Write a BarCode field
+	d.ean13( origin=(210,60), ean=unicode(product_ean), height_dots = 50 )
+	
+	d.field( origin=(35,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	d.field( origin=(80,165), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	
+	d.field( origin=(325,187), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
+def print_product_label_large( product_id, product_ref, product_ean, qty ):
+	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Write a BarCode field
+	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode( product_ref) ) # use font E as default
+	
+	d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
+	d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+		
+	d.field( origin=(225,150), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	d.field( origin=(255,175), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	
+
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
+def print_warranty_label_large( prefix_text, counter_start, label_count ):
+	""" Print the Warranty Label on the GK420t on 70mm width x 2.5mm height labels """
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+
+	for label_counter in range( label_count ):
+		d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = 'Warranty %s for %i' % (prefix_text, counter_start+counter_start + label_counter) )
+	
+		# Start a Print format
+		d.format_start()
+
+		# Write a BarCode field
+		d.field( origin=(175,11), font=d.font('T',17,8), data= unicode( 'Garantie / Warranty') ) # use font E as default
+		d.field( origin=(175,62), font=d.font('T',17,8), data= unicode( '%s-%i' % (prefix_text, counter_start + label_counter) ) )# use font E as default
+	
+		#d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
+		# d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+		
+		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, vous les conditions' )
+		d.field( origin=(175,145), font=d.font('C'), data=u'générales de ventes sur shop.mchobby.be' )
+	
+
+		# End Print format
+		d.format_end()
+
+	
+		medium.open() # Open the media for transmission. 
+					  # With CUPS medium this open a temporary file
+		try:
+			d.send()  # With CUPS medium this send the data to the temporary file
+			medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+		finally:
+			medium.close()
+			del( d )  
+		
+	
+	del( medium )
+
+def print_ondemand_label_large( label_title, label_lines, qty ):
+	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
+	
+	label_title: title on the label, first line in extra bold
+	label_lines: list of unicode to be printed (up to 5 lines)"""
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Write a BarCode field
+	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode(label_title) ) # use font E as default
+	top = 62
+	for line in label_lines:
+		d.field( origin=(175, top), font=d.font('C'), data=line )
+		top = top + 25
+	
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+	
+def print_ondemand_label_kingsize( label_title, label_title2, qty=1 ):
+	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
+	
+	label_title: title on the label (the only text to print) """
+
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )	
+	d.field( origin=(125,11), font=d.font('V',80,71), data= unicode(label_title) ) 
+	if len( label_title2 )>0:
+		d.field( origin=(125,11+80), font=d.font('V',80,71), data= unicode(label_title2) ) 
+		
+	#top = 62
+	#for line in label_lines:
+	#	d.field( origin=(175, top), font=d.font('C'), data=line )
+	#	top = top + 25
+	
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
+def print_ondemand_label_short( label_title, label_lines, qty ):
+	""" Print the Labels on the LP2824 on small labels 
+	
+	label_title: title on the label, lines 1 & two in extra bold
+	label_lines: list of unicode to be printed (up to 5 lines)"""
+	#print product_id
+	#print product_ref
+	#print product_ean
+	#print qty
+	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
+	
+	# Start a Print format
+	d.format_start()
+	
+	# Set Quantity 
+	if qty > 1:
+		d.print_quantity( qty )
+
+	# Write a BarCode field
+	#   Change d.font('E') to d.font('T',17,8 )
+	d.field( origin=(40,11), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[:24] ) )
+	d.field( origin=(40,45), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[24:] ) )
+	top = 95
+	for line in label_lines:
+		d.field( origin=(40, top), font=d.font('C'), data=line )
+		top = top + 25
+	
+	# End Print format
+	d.format_end()
+
+	
+	medium.open() # Open the media for transmission. 
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue  
+	finally:
+		medium.close()  
+		               
+	
+	del( medium )
+
+def ean12_to_ean13():
+	""" calculate the checksum of an ean12 to create an ean13 """
+	value = raw_input( 'Ean12: ' )
+	if not( value.isdigit() ) or not ( len(value)== 12 ):
+		print 'EAN12 must have 12 digits!' 
+		return
+	print( 'Ean13: %s' % calculate_ean13( value ) )
+				
+#def product_combination_to_ean13():
+#	""" Create an ean13 from the mchobby product id + combination id """
+#	value = raw_input( 'Product ID: ' )
+#	if not( value.isdigit() ):
+#		print 'Product ID can only have digits!' 
+#		return
+#
+#	value2 = raw_input( 'Combination ID: ' )
+#	if not( value2.isdigit() ):
+#		print 'Combination ID can only have digits!' 
+#		return
+#
+#	product_ean = '32322%02i%05i' % (int(value2),int(value)) # prefix 3232 + combination 2 + id_combination + id_product
+#	product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
+#	print( 'Ean13: %s' % product_ean )
+
+def print_large_labels():
+	""" Ask the user for the data to print an OnDemand label for large format """
+	lines = [] 
+	title = 'My onDemand label test!' # Title cannot be unicode
+	_size = 'large'
+	 
+	title = raw_input( 'Title (sans accent) or +q: ' )
+	if title == '+q': # user abord
+		return
+	
+	print( 'Key in the lines (6 lines max):' )
+	print( '  +q to quit'        ) 
+	print( '  empty to proceed)' )
+	iLine = 0
+	while True:
+		iLine += 1
+		aLine = raw_input( '%i: ' % iLine )
+		if len( aLine ) == 0:
+			break
+		if aLine == '+q': # User abord
+			return 
+		
+		# Decode the line otherwise the unicode quest an ascii string
+		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		if iLine == 6:
+			break
+	
+	value = raw_input( 'How many labels ?' )
+	if value == 0:
+		return
+	if value == '+q':
+		return
+	if value == '': # By default, 1 label
+		value = 1
+		
+	qty = int( value )
+	if qty > 25:
+		print( 'Max 25 labels allowed! Value sharped to 25.' )
+		qty = 25
+		
+	print_ondemand_label_large( title, lines, qty )
+
+def print_vat_labels():
+	""" Ask the user for the data to print an OnDemand label for large format """
+	lines = [] 
+	title = 'Exempte de TVA Belge' # Title cannot be unicode
+	 
+	# Decode the line otherwise the unicode quest an ascii string
+	lines.append( u"Conformément à l'Article 39 bis du Code"  )
+	lines.append( u"de la TVA."  )
+	lines.append( u"Livraison Intracommunautaire de Biens."  )
+	lines.append( u"Autoliquidation."  )
+	
+	value = raw_input( 'How many labels ?' )
+	if value == 0:
+		return
+	if value == '': # By default, 1 label
+		value = 1
+		
+	qty = int( value )
+	if qty > 50:
+		print( 'Max 50 labels allowed! Value sharped to 50.' )
+		qty = 50
+		
+	print_ondemand_label_large( title, lines, qty )
+
+def print_short_labels():
+	""" Ask the user for the data to print an OnDemand label for short format """
+	lines = [] 
+	title = 'My onDemand label test!' # Title cannot be unicode
+	 
+	title = raw_input( 'Title (sans accent) or +q: ' )
+	if title == '+q': # user abord
+		return
+	
+	print( 'Key in the lines (+q to quit, empty to proceed)' )
+	iLine = 0
+	while True:
+		iLine += 1
+		aLine = raw_input( '%i: ' % iLine )
+		if len( aLine ) == 0:
+			break
+		if aLine == '+q': # User abord
+			return  
+		
+		# Decode the line otherwise the unicode quest an ascii string
+		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		if iLine == 6:
+			break
+	
+	value = raw_input( 'How many labels ?' )
+	if value == 0:
+		return
+	if value == '+q':
+		return
+	if value == '': # By default, 1 label
+		value = 1
+		
+	qty = int( value )
+	if qty > 25:
+		print( 'Max 25 labels allowed! Value sharped to 25.' )
+		qty = 25
+		
+	print_ondemand_label_short( title, lines, qty )
+
+
+if __name__ == '__main__':
+	print( 'This file only contains helper functions!' )
+	print( 'Nothing to run here!' )
+
