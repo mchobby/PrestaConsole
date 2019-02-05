@@ -27,7 +27,7 @@ MA 02110-1301, USA.
 import warnings 
 warnings.filterwarnings("ignore")
 
-from prestaapi import PrestaHelper, CachedPrestaHelper
+from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
 from pprint import pprint
@@ -46,7 +46,8 @@ except Exception as err:
 	print( '[ERROR] Unable to load TKinter dependencies! %s' % err )
 
  
-from labelprn import handle_print_for_product 
+from labelprn import handle_print_for_product, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
+		handle_print_warranty_label_large, handle_print_vat_label_large
 # from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
 #RE_COMMAND                = "^\+([a-zA-Z])$"       # (command) +r OU +s 
@@ -62,8 +63,6 @@ signal.signal(signal.SIGINT, catch_ctrl_C)
 #PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
 #PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
 #PRINTER_ENCODING = 'cp850'
-
-
 
 
 def list_products( cachedphelper, key ):
@@ -136,7 +135,6 @@ def build_supplier_product_list( cachedphelper ):
 
 
 
-
 def progressHandler( prestaProgressEvent ):
 	if prestaProgressEvent.is_finished:
 		print( '%s' %prestaProgressEvent.msg )
@@ -197,7 +195,8 @@ class BaseApp( object ):
 
 		# Treat really special case 
 		#   Backward compatibility
-		if (len( params ) == 1) and not( params[0] in self.KEYWORDS ):
+		if (len( params ) == 1) and not( params[0] in self.KEYWORDS ) and \
+		    not( any([item for item in self.COMMANDS if item[0]==params[0]]) ): # Note: somes command makes only one word (and are not keyword)
 			# we are looking for product OR having a product ID
 			if params[0].isdigit(): # it is an ID
 				params.insert(0, 'print')
@@ -308,6 +307,11 @@ COMMANDS = [
     ('list product'   , '+' ),  
 	('list supplier'  , '*' ), 
 	('print product'  , 1   ), 
+	('print small'    , 0   ),
+	('print large'    , 0   ),
+	('print king'     , 0   ),
+	('print war'      , 0   ),
+	('print vat'      , 0   ),
 	('quit'           , 0   ),
 	('reload stock'   , 0   ),
 	('reload'         , 0   ),
@@ -316,7 +320,8 @@ COMMANDS = [
 	('set option'     , 2   ),
 	('show debug'     , 0   ),
 	('show option'    , '*' ),
-	('show stat'      , 0   )
+	('show stat'      , 0   ),
+	('upgrade'        , 0   )
 	]
 
 
@@ -432,10 +437,10 @@ class App( BaseApp ):
 	# ---------------------------------------------------------------------------
 	def do_ean( self, params ):
 		""" Generates the EAN13 for the ID_Product """
-		assert len(params)>0 and isdigit( params[0], str ), 'the parameter must be an ID product'
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
 
 		_id = int( params[0] )
-		product_ean = '32321%07i' % int(value) # prefix 3232 + product 1 + id_product
+		product_ean = '32321%07i' % _id  # prefix 3232 + product 1 + id_product
 		product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 		print( '%s' % product_ean )				
 
@@ -503,6 +508,14 @@ class App( BaseApp ):
 				id_supplier = int( _lst[0].id )
 				show_product_list( id_supplier )	
 
+	def do_print_small( self, params ):
+		handle_print_custom_label_small()
+
+	def do_print_king( self, params ):
+		handle_print_custom_label_king()
+
+	def do_print_large( self, params ):
+		handle_print_custom_label_large()
 
 	def do_print_product( self, params ):
 		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
@@ -510,6 +523,12 @@ class App( BaseApp ):
 		_id = int( params[0] )
 		_product = self.cachedphelper.products.product_from_id( _id )
 		handle_print_for_product( _product, self.get_product_params( _id ) )
+
+	def do_print_war( self, params ):
+		handle_print_warranty_label_large()
+
+	def do_print_vat( self, params ):
+		handle_print_vat_label_large()
 
 	def do_quit( self, params ):
 		print( "User exit!")
@@ -580,6 +599,12 @@ class App( BaseApp ):
 		print( '%6i product suppliers available' % len( self.cachedphelper.product_suppliers ) )
 		print( '%6i last product id' % self.cachedphelper.products.last_id )
 
+	def do_upgrade( self, params ):
+		""" Just upgrade the software from GitHub depot. """
+		if os.system( 'git fetch' )!=0:
+			raise Exception( 'git fetching failure!' )
+		if os.system( 'git pull' )!=0:
+			raise Exception( 'git pulling failure!')
 
 
 def main():

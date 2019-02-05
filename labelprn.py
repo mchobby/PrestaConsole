@@ -27,12 +27,33 @@ MA 02110-1301, USA.
 """  
 
 import logging
+import sys
 from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
 PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
 PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
 PRINTER_ENCODING = 'cp850'
 	
+def request_qty( prompt = 'How many items ?'):
+	""" Request a quantity and confirm it if greater than 25 """
+	value = raw_input( prompt )
+	if value == 0:
+		return None
+	if value == '+q':
+		return None
+	if value == '': # By default, 1 label
+		value = 1
+
+	qty = int( value )
+	if qty > 25:
+		value2 = raw_input( 'Quantity > 25! Please confirm: ' )
+		if not value2.isdigit():
+			print( '%s is not a numeric value, ABORT!' % value2 )
+			return None
+		elif int(value2) != int(qty):
+			print( 'inconsistant values %s & %s' % (qty, value2) )
+			return	None
+	return qty
 		
 def handle_print_for_product( product, params ):
 	""" Manage the tickect printing for an ID product.
@@ -88,7 +109,121 @@ def handle_print_for_product( product, params ):
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			print_product_label_large( product.id, product.reference, product.ean13, int(value) )	 
 		return
+
+def handle_print_custom_label_large():
+	""" Ask the user for the data to print an OnDemand label for large format """
+	lines = [] 
+	title = 'My onDemand label test!' # Title cannot be unicode
+	_size = 'large'
+	 
+	title = raw_input( 'Title (sans accent) or +q: ' )
+	if title == '+q': # user abord
+		return
 	
+	print( 'Key in the lines (6 lines max):' )
+	print( '  +q to quit'        ) 
+	print( '  empty to proceed)' )
+	iLine = 0
+	while True:
+		iLine += 1
+		aLine = raw_input( '%i: ' % iLine )
+		if len( aLine ) == 0:
+			break
+		if aLine == '+q': # User abord
+			return 
+		
+		# Decode the line otherwise the unicode quest an ascii string
+		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		if iLine == 6:
+			break
+	
+	qty = request_qty()
+	if qty == None:
+		return 
+
+	print_custom_label_large( title, lines, qty )
+
+def handle_print_custom_label_king():
+	""" Print King Size Label - 2 lines only """
+	line1 = raw_input( 'Line 1: ' )
+	if line1 == '+q' or line1 == '':
+		return
+	line2 = raw_input( 'Line 2: ' )
+	qty = request_qty()
+	if qty == None:
+		return
+
+	print_custom_label_king( line1, line2, qty )
+
+def handle_print_custom_label_small():
+	""" Ask the user for the data to print an OnDemand label for short format """
+	lines = [] 
+	title = 'My onDemand label test!' # Title cannot be unicode
+	 
+	title = raw_input( 'Title (sans accent) or +q: ' )
+	if title == '+q': # user abord
+		return
+	
+	print( 'Key in the lines (+q to quit, empty to proceed)' )
+	iLine = 0
+	while True:
+		iLine += 1
+		aLine = raw_input( '%i: ' % iLine )
+		if len( aLine ) == 0:
+			break
+		if aLine == '+q': # User abord
+			return  
+		
+		# Decode the line otherwise the unicode quest an ascii string
+		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		if iLine == 6:
+			break
+	
+	qty = request_qty()
+	if qty == None:
+		return
+		
+	print_custom_label_small( title, lines, qty )
+
+def handle_print_warranty_label_large():
+	prefix_str = raw_input(    'Préfix ou +q (ex:ELI-MEGA)             : ' )
+	if prefix_str == '+q':
+		return
+	counter_start = raw_input( 'N° première étiquette ou +q (ex:150021): ' )
+	if counter_start == '+q':
+		return
+	counter_start = int( counter_start ) 
+	how_many_label= raw_input( "Combien d'étiquette ou +q             : " )
+	if how_many_label == '+q':
+		return
+	how_many_label = int( how_many_label )
+
+	print_warranty_label_large( prefix_text = prefix_str, counter_start = counter_start, label_count = how_many_label )
+
+def handle_print_vat_label_large():
+	""" Ask the user for the data to print an OnDemand label for large format """
+	lines = [] 
+	title = 'Exempte de TVA Belge' # Title cannot be unicode
+	 
+	# Decode the line otherwise the unicode quest an ascii string
+	lines.append( u"Conformément à l'Article 39 bis du Code"  )
+	lines.append( u"de la TVA."  )
+	lines.append( u"Livraison Intracommunautaire de Biens."  )
+	lines.append( u"Autoliquidation."  )
+	
+	qty = request_qty()
+	if qty == None:
+		return
+		
+	print_custom_label_large( title, lines, qty )
+
+# ===================================================================
+#
+#      BASIC PRINT FUNCTIONS 
+#
+# ===================================================================
+
+
 def print_product_label( product_id, product_ref, product_ean, qty ):
 	""" Print the Labels on the Zebra LP 2824 on 1.25" x 1" labels """
 	#print product_id
@@ -240,10 +375,7 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 
 def print_warranty_label_large( prefix_text, counter_start, label_count ):
 	""" Print the Warranty Label on the GK420t on 70mm width x 2.5mm height labels """
-	#print product_id
-	#print product_ref
-	#print product_ean
-	#print qty
+
 	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
 
 	for label_counter in range( label_count ):
@@ -259,7 +391,7 @@ def print_warranty_label_large( prefix_text, counter_start, label_count ):
 		#d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
 		# d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
 		
-		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, vous les conditions' )
+		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, voir les conditions' )
 		d.field( origin=(175,145), font=d.font('C'), data=u'générales de ventes sur shop.mchobby.be' )
 	
 
@@ -280,7 +412,7 @@ def print_warranty_label_large( prefix_text, counter_start, label_count ):
 	
 	del( medium )
 
-def print_ondemand_label_large( label_title, label_lines, qty ):
+def print_custom_label_large( label_title, label_lines, qty ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
 	
 	label_title: title on the label, first line in extra bold
@@ -322,7 +454,7 @@ def print_ondemand_label_large( label_title, label_lines, qty ):
 	
 	del( medium )
 	
-def print_ondemand_label_kingsize( label_title, label_title2, qty=1 ):
+def print_custom_label_king( label_title, label_title2, qty=1 ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels 
 	
 	label_title: title on the label (the only text to print) """
@@ -361,7 +493,7 @@ def print_ondemand_label_kingsize( label_title, label_title2, qty=1 ):
 	
 	del( medium )
 
-def print_ondemand_label_short( label_title, label_lines, qty ):
+def print_custom_label_small( label_title, label_lines, qty ):
 	""" Print the Labels on the LP2824 on small labels 
 	
 	label_title: title on the label, lines 1 & two in extra bold
@@ -429,47 +561,7 @@ def ean12_to_ean13():
 #	product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 #	print( 'Ean13: %s' % product_ean )
 
-def print_large_labels():
-	""" Ask the user for the data to print an OnDemand label for large format """
-	lines = [] 
-	title = 'My onDemand label test!' # Title cannot be unicode
-	_size = 'large'
-	 
-	title = raw_input( 'Title (sans accent) or +q: ' )
-	if title == '+q': # user abord
-		return
-	
-	print( 'Key in the lines (6 lines max):' )
-	print( '  +q to quit'        ) 
-	print( '  empty to proceed)' )
-	iLine = 0
-	while True:
-		iLine += 1
-		aLine = raw_input( '%i: ' % iLine )
-		if len( aLine ) == 0:
-			break
-		if aLine == '+q': # User abord
-			return 
-		
-		# Decode the line otherwise the unicode quest an ascii string
-		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
-		if iLine == 6:
-			break
-	
-	value = raw_input( 'How many labels ?' )
-	if value == 0:
-		return
-	if value == '+q':
-		return
-	if value == '': # By default, 1 label
-		value = 1
-		
-	qty = int( value )
-	if qty > 25:
-		print( 'Max 25 labels allowed! Value sharped to 25.' )
-		qty = 25
-		
-	print_ondemand_label_large( title, lines, qty )
+
 
 def print_vat_labels():
 	""" Ask the user for the data to print an OnDemand label for large format """
@@ -495,44 +587,7 @@ def print_vat_labels():
 		
 	print_ondemand_label_large( title, lines, qty )
 
-def print_short_labels():
-	""" Ask the user for the data to print an OnDemand label for short format """
-	lines = [] 
-	title = 'My onDemand label test!' # Title cannot be unicode
-	 
-	title = raw_input( 'Title (sans accent) or +q: ' )
-	if title == '+q': # user abord
-		return
-	
-	print( 'Key in the lines (+q to quit, empty to proceed)' )
-	iLine = 0
-	while True:
-		iLine += 1
-		aLine = raw_input( '%i: ' % iLine )
-		if len( aLine ) == 0:
-			break
-		if aLine == '+q': # User abord
-			return  
-		
-		# Decode the line otherwise the unicode quest an ascii string
-		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
-		if iLine == 6:
-			break
-	
-	value = raw_input( 'How many labels ?' )
-	if value == 0:
-		return
-	if value == '+q':
-		return
-	if value == '': # By default, 1 label
-		value = 1
-		
-	qty = int( value )
-	if qty > 25:
-		print( 'Max 25 labels allowed! Value sharped to 25.' )
-		qty = 25
-		
-	print_ondemand_label_short( title, lines, qty )
+
 
 
 if __name__ == '__main__':

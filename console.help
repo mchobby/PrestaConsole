@@ -30,6 +30,11 @@ Quick help :
 * The command "show command" show the list of supported command.
 * The command "show debug" show many information about internal state.
 
+Startup file :
+--------------
+When present, the "console.startup" is loaded from the local directory.
+This file can contains several command lines that will executed at startup.
+
 
 HELP Commands :
 ===============
@@ -73,8 +78,40 @@ list supplier <PARAM> :
 
 print product <ID> :
 
-  print label for the product <ID>. Interactive command would allow to 
-  choose the number of labels.
+  print label for the product <ID>.
+  Interactive command would allow to choose the number of labels.
+
+
+print small :
+  
+  Print custom information on small zebra label 25.4mm x 25.4mm
+  Title in printed in BOLD and splitted in 2 lines (split at 24th characters).
+  Interactive command would allow to choose the number of labels. 
+
+
+print large :
+
+  Print custom content with LARGE TITLE on 70 x 25mm label
+  and up to 5 lines in small font.
+  Interactive command would allow to choose the number of labels.
+
+
+print king :
+
+   Print custom content with KING SIZE TITLE on 70 x 25mm label
+   Can also print a second line with KING SIZE font.
+   Interactive command would allow to choose the number of labels.
+
+
+print vat :
+    
+    Print Intracommunautary labels.
+
+
+print war :
+    
+    Print warranty labels with prefix code + increasing numbers.
+
 
 reload :
 
