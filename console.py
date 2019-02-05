@@ -293,6 +293,8 @@ KEYWORDS = {
 	'quit'    : ['q', 'exit'],
 	'help'    : ['?', 'h'],
 	'stock'   : ['s'],
+	'1'       : ['true'],
+    '0'       : ['false'],
 	None      : ['to', 'from'] # remove any from and to
 
 }
