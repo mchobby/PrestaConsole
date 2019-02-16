@@ -52,29 +52,7 @@ logging.basicConfig( filename=config.logfile, level=logging.DEBUG,
 # LABEL Size is stored into the article reference of the "PARAMS" supplier.
 ID_SUPPLIER_PARAMS = None
 
-def list_products( cachedphelper, key ):
-	""" Search for a product base on its partial reference code + list them """
-	assert isinstance( key, str ), 'Key must be a string'
-	if len( key ) < 3:
-		print( 'searching product requires at least 3 characters' )
-		return
-	
-	if key[0] == '/':  # search on Supplier Ref
-		result = cachedphelper.search_products_from_supplier_ref( key[1:] ) # Skip the /
-	elif key[0] == '*': # search on label
-		result = cachedphelper.search_products_from_label( key[1:] ) # Skip the *
-	else:
-		result = cachedphelper.search_products_from_partialref( key, include_inactives = True )
-	
 
-
-	for psr in result: # Returns a list of ProductSearchResult
-		print( '%7i : %s : %5i : - %s - %s' % ( \
-			psr.product_data.id, \
-			psr.product_data.reference.ljust(30), \
-			psr.qty, \
-			psr.product_data.name.ljust(50), \
-			psr.supplier_refs ) )
 		
 def get_product_params_dic( cachedpHelper,id_product ):
 	""" Locate the product parameter stored in the PARAMS supplier
@@ -699,24 +677,13 @@ def main():
 		
 		if value == '+q':
 			pass
-		elif value == '+r':
-			print( 'Contacting WebShop and reloading...' )
-			cachedphelper.load_from_webshop()
-			initialize_globals() # reinit global variables	
-		elif value == '+s':
-			print( 'Saving cache...' )
-			cachedphelper.save_cache_file()
-		elif value == '+u':
-			print( 'Refreshing stock quantities...' )
-			cachedphelper.refresh_stock()
 		elif value == '+12':
 			ean12_to_ean13()
 		elif value == '+e':
 			product_id_to_ean13()
 		elif value == '+f':
 			product_combination_to_ean13()
-		elif value == '+h':
-			show_help()
+
 		elif value == '+ol': #On_demand Large label
 			ondemand_label_large()
 		elif value == '+os': #On_demand Short label
@@ -796,8 +763,8 @@ def main():
 		elif value.isdigit():
 			print_for_product( cachedphelper, int(value) )
 		else:
-			print( 'Looking for product %s...' % value )
-			list_products( cachedphelper, value )
+			#print( 'Looking for product %s...' % value )
+			#list_products( cachedphelper, value )
 
 	return
 
