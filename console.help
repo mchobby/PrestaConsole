@@ -21,8 +21,12 @@ The keyword equivalence can be find with the command "help keyword <THE_KEYWORD>
 Special use-case :
 -----------------:
 Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command "list product <WORD>" (or /<WORD> or *<WORD>) and will show the results.
-
 If the <WORD> only contains digits then the command is translated to "print product <WORD>" and print the product label.
+
+It also exist bag manipulation commands
+	* add/remove IDs       with +3*125 or -4*1024
+    * add/remove TEXT      with +3*gsm or +3*g125 or -2*demo
+    * add/remove single ID with +123   or -123
 
 Quick help :
 ------------
@@ -56,9 +60,60 @@ help command :
 GENERAL PURPOSE Commands :
 ==========================
 
+bag :
+
+  Show the content of the bag (shopping basket)
+
+
 ean <ID> :
 
   Calculate the product EAN13 of <ID> and display it on the console
+
+editor once  :
+editor begin :
+editor end   :
+editor abort :
+
+  Work all the same as "print once", "print begin", ... but opens and editor with
+  the text instead of printing the result.
+  Note: the editor to stars is mentionned in the "editor" option.
+
+label product <ID> :
+
+  print label for the product <ID>.
+  Interactive command would allow to choose the number of labels.
+
+
+label small :
+  
+  Print custom information on small zebra label 25.4mm x 25.4mm
+  Title in printed in BOLD and splitted in 2 lines (split at 24th characters).
+  Interactive command would allow to choose the number of labels. 
+
+
+label large :
+
+  Print custom content with LARGE TITLE on 70 x 25mm label
+  and up to 5 lines in small font.
+  Interactive command would allow to choose the number of labels.
+
+
+label king :
+
+   Print custom content with KING SIZE TITLE on 70 x 25mm label
+   Can also print a second line with KING SIZE font.
+   Interactive command would allow to choose the number of labels.
+
+
+label vat :
+    
+    Print Intracommunautary labels.
+
+
+label war :
+    
+    Print warranty labels with prefix code + increasing numbers.
+
 
 list product <PARAM> :
 
@@ -70,47 +125,35 @@ list product <PARAM> :
 
 list supplier :
 list supplier <PARAM> :
+list supplier <PARAM> order :
   
   Show the list of suppliers or filter it on <PARAM> to reduce the list.
   if <PARAM> is an ID or reduce the list to ONLY ONE supplier 
   then it show the list of attached products.
 
+  When "order" is mentionned, the list is reduced to items having a
+  value mentionned in the QM Warning (/!\) column. The QM Warning
+  column can be displayed with the option "show-product-qm".
 
-print product <ID> :
+print once :
 
-  print label for the product <ID>.
-  Interactive command would allow to choose the number of labels.
+  will output the next command to the printer by using the print-xxx options
 
 
-print small :
+print begin :
+
+  will start to record all the command output until the "print end" is executed.
+
+
+print end :
+
+  will ends the output recording and sends the result to the printer by using
+  the print-xxx options.
+
+
+print abort :
   
-  Print custom information on small zebra label 25.4mm x 25.4mm
-  Title in printed in BOLD and splitted in 2 lines (split at 24th characters).
-  Interactive command would allow to choose the number of labels. 
-
-
-print large :
-
-  Print custom content with LARGE TITLE on 70 x 25mm label
-  and up to 5 lines in small font.
-  Interactive command would allow to choose the number of labels.
-
-
-print king :
-
-   Print custom content with KING SIZE TITLE on 70 x 25mm label
-   Can also print a second line with KING SIZE font.
-   Interactive command would allow to choose the number of labels.
-
-
-print vat :
-    
-    Print Intracommunautary labels.
-
-
-print war :
-    
-    Print warranty labels with prefix code + increasing numbers.
+  just abort any printing recording operation.
 
 
 reload :
@@ -144,7 +187,7 @@ show option :
 
   show mentionned option otherwise all the options
 
-set option <NAME> <VALUE> :
+set <NAME> <VALUE> :
   
   modify the option <NAME> (always lowercase, see CONSOLE OPTIONS section) with the mentionned value.
   Use 1 or 0 for boolean.
@@ -162,6 +205,9 @@ Console options can be check with "show option" and "set option".
 option name are ALWAYS lowercase, without space (use - instead).
 Boolean values are 1 or 0.
 
+editor               ('pluma' by default)
+
+    The text editor to start when exporting content
 
 inactive-product     (0 = inactive by default) 
 
@@ -171,7 +217,18 @@ inactive-product     (0 = inactive by default)
 include-it           (0 = inactive by default)
 
     Include the [IT] products in the product search.
-  
+
+landscape            (1 = ACTIVE by default)
+
+    Print in landscape format with print command.
+
+
+show-product-qm      (0 = inactive by default)
+
+    Show the product QM (Quantity Minimal) column
+    and /!\ Warning order column when displaying
+    list of products
+
 
 show-product-pa      (1 = ACTIVE by default)
 
@@ -186,3 +243,24 @@ show-product-pv      (1 = ACTIVE by default)
 show-product-label   (1 = ACTIVE by default)
 
     Show the product label in the ouput.
+
+print-landscape      (1 = ACTIVE by default)
+
+    print the content of output in landscape 
+
+
+print-cpi            (12 by default)
+
+    characters per line. use cpi = 10 for bigger text.
+    use cpi = 15 for smaller text.
+
+
+print-lpi           (7 by default)
+
+    line per inch. use lpi = 6 for bigger text.
+    Use lpi = 9 fpr smaller text (or even 12)
+
+print-sides          ('one-sided' by default)
+
+    Allow to change the recto, recto-verso option.
+    Allowed values are: one-sided, two-sided-short-edge, two-sided-long-edge

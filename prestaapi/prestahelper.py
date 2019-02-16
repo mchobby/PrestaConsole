@@ -424,13 +424,37 @@ class PrestaProgressEvent( object ):
 	def set_finished( self ):
 		""" A progress Bar is finished when current step < 0 :-) """
 		self.current_step = -1 
+
+class ProductSearchResultList( list ):
+
+	def merge( self, psr_list ):
+		"""  Merge the current list with the psr_list in paramter. Do not add twice the same id_product ! 
+
+		:param psr_list: the PoructSearchResultList to merge in the current instance. """
+		ids = [psr.product_data.id for psr in self]
+		for item in psr_list:
+			if not( item.product_data.id in ids ):
+				self.append( item )
+
+	def filter_out( self, filter_fn ):
+		""" Remove from the this the items where the filter function returns False 
+
+		:param filter_fn: the filtering fonction receiving the ProductSearchResult in parameter and returning True/False """
+		_todel = []
+		for psr in self:
+			if filter_fn( psr ):
+				_todel.append( psr )
+		for psr in _todel:
+			self.remove( psr )
+
 		 
 class ProductSearchResult( object ):
 
 	def __init__( self, product_data ):
 		self._product_data = product_data
 		self._product_suppliers = []
-		self._qty = 0
+		self._qty = 0            # Qty in Stock
+		self._ordered_qty = None # Optinal : an ordered quantity
 
 	@property
 	def product_data( self ):
@@ -441,12 +465,21 @@ class ProductSearchResult( object ):
 
 	@property
 	def qty(self):
-		""" Qty available for this quantity """
+		""" Stock Qty available for this quantity """
 		return self._qty
 
 	@qty.setter
 	def qty(self, value):
 	    self._qty = value
+
+	@property
+	def ordered_qty( self ):
+		""" optional ordered quantity. None by default """
+		return self._ordered_qty
+
+	@ordered_qty.setter
+	def ordered_qty( self, value ):
+		self._ordered_qty = value
 
 	@property
 	def product_suppliers( self ):
@@ -599,10 +632,18 @@ class CachedPrestaHelper( PrestaHelper ):
 			else:
 				psr.qty = -999
 
+	def psr_instance( self, product ):
+		""" HELPER: create a ProductSearchResult instance for a given product and initialize 
+		    all dependencies as supplier references and current stock quantity """
+		_psr = ProductSearchResult( product )
+		_psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
+		self.__update_search_product_qty( [_psr] )
+		return _psr
+
 	def search_products_from_partialref(  self, sPartialRef, include_inactives = False ):
 		""" Find an active product from a partial reference """
 		_products = self.__product_list.search_products_from_partialref( sPartialRef, include_inactives )
-		_result = []
+		_result = ProductSearchResultList()
 		for product in _products:
 			psr = ProductSearchResult( product )
 			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
@@ -613,7 +654,7 @@ class CachedPrestaHelper( PrestaHelper ):
 	def search_products_from_label(  self, sPartial, include_inactives = False ):
 		""" Find an active product from a partial label """
 		_products = self.__product_list.search_products_from_label( sPartial, include_inactives )
-		_result = []
+		_result = ProductSearchResultList()
 		for product in _products:
 			psr = ProductSearchResult( product )
 			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
@@ -624,7 +665,7 @@ class CachedPrestaHelper( PrestaHelper ):
 	def search_products_from_supplier_ref( self, sPartialRef, include_inactives = False ):
 		""" Find an active product having the mentionned supplier reference """
 		product_suppliers = self.__product_supplier_list.search_for_partialref( sPartialRef )
-		_result = []
+		_result = ProductSearchResultList()
 		for product_supplier in product_suppliers:
 			_p = self.__product_list.product_from_id( product_supplier.id_product )
 			if _p:
@@ -634,11 +675,18 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__update_search_product_qty( _result )
 		return _result 
 
-	def search_products_from_supplier( self, id_supplier, include_inactives = False ):
-		""" Find products for a supplier """
+	def search_products_from_supplier( self, id_supplier, include_inactives = False, filter = None ):
+		""" Find products for a supplier.
+
+		:param include_inactives: include inactive products in the selection.
+		:param filter: apply a filter on product (as parameter) to select it (otherwise is select the product). """
 		_products = self.__product_list.search_products_from_supplier( id_supplier, include_inactives )
-		_result = []
+		_result = ProductSearchResultList()
 		for product in _products:
+			# Filter
+			if filter and not filter( product ):
+				continue
+
 			psr = ProductSearchResult( product )
 			# find all supplier red anyway
 			psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product.id ) )
@@ -710,7 +758,7 @@ class BaseDataList( list ):
 		self.helper = owner
 		
 	def add_data_object( self, aBaseData ):
-		""" Register a BaseData children into the list """
+		""" Register a BaseData chilphotoen into the list """
 		self.append( aBaseData )
 		
 	def pickle_data( self, fh ):

@@ -27,7 +27,7 @@ MA 02110-1301, USA.
 import warnings 
 warnings.filterwarnings("ignore")
 
-from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13
+from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
 from pprint import pprint
@@ -38,6 +38,9 @@ import re
 import traceback
 import os
 import xml.etree.cElementTree as etree
+import tempfile
+import datetime
+from bag import ToteBag, ToteItem
 
 try:
 	#from Tkinter import *
@@ -65,73 +68,40 @@ signal.signal(signal.SIGINT, catch_ctrl_C)
 #PRINTER_ENCODING = 'cp850'
 
 
-def list_products( cachedphelper, key ):
-	""" Search for a product base on its partial reference code + list them """
-	assert isinstance( key, str ), 'Key must be a string'
-	if len( key ) < 3:
-		print( 'searching product requires at least 3 characters' )
-		return
-	
-	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
-	for item in result:
-		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
+#def list_products( cachedphelper, key ):
+#	""" Search for a product base on its partial reference code + list them """
+#	assert isinstance( key, str ), 'Key must be a string'
+#	if len( key ) < 3:
+#		print( 'searching product requires at least 3 characters' )
+#		return
+#	
+#	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
+#	for item in result:
+#		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
 
 
-def get_product_params_dic( cachedpHelper,id_product ):
-	""" Locate the product parameter stored in the PARAMS supplier
-	    reference on the product. The reference is coded as follow
-	    param1:value1,param2:value2 """
-	
-	# If this special PARAMS supplier is not yet identified then
-	#   not possible to locate the special product parameter
-	#   stored there 
-	if ID_SUPPLIER_PARAMS == None:
-		return {}
-	
-	reference = ''
-	try:	
-		reference = cachedpHelper.product_suppliers.reference_for( id_product, ID_SUPPLIER_PARAMS )
-		# print( 'reference: %s' % reference )
-		if len(reference )==0:
-			return {}
-		
-		result = {}
-		lst = reference.split(',')
-		for item in lst:
-			vals = item.split(':')
-			if len( vals )!= 2:
-				raise Exception( 'a parameter must have 2 parts!' )
-			result[vals[0]] = vals[1]
-		
-		return result
-		
-	except Exception as e:
-		print( 'Error while processing param %s with message %s ' % (reference,str(e)) )	
-		return {}
-
-
-def build_supplier_product_list( cachedphelper ):
-	""" Build a list of product for that supplier (the default supplier) """
-	r = []
-	products = cachedphelper.get_products()
-	for item in products:
-		_cargo = Product_cargo( item )
-		# Identify stock information
-		stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
-		if stock:
-			_cargo.qty_stock = stock.quantity
-		r.append( _cargo )
-	# Also locates all the IT-xxx articles.
-	# They are NOT ACTIVE so we would not duplicate them 
-	for item in products.inactivelist:
-		if item.reference.find( 'IT-' ) == 0:
-			_cargo = Product_cargo( item )
-			# Identify stock information
-			stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
-			if stock:
-				_cargo.qty_stock = stock.quantity
-			r.append( _cargo )			
-	return r
+#def build_supplier_product_list( cachedphelper ):
+#	""" Build a list of product for that supplier (the default supplier) """
+#	r = []
+#	products = cachedphelper.get_products()
+#	for item in products:
+#		_cargo = Product_cargo( item )
+#		# Identify stock information
+#		stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
+#		if stock:
+#			_cargo.qty_stock = stock.quantity
+#		r.append( _cargo )
+#	# Also locates all the IT-xxx articles.
+#	# They are NOT ACTIVE so we would not duplicate them 
+#	for item in products.inactivelist:
+#		if item.reference.find( 'IT-' ) == 0:
+#			_cargo = Product_cargo( item )
+#			# Identify stock information
+#			stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
+#			if stock:
+#				_cargo.qty_stock = stock.quantity
+#			r.append( _cargo )			
+#	return r
 
 
 
@@ -140,6 +110,52 @@ def progressHandler( prestaProgressEvent ):
 		print( '%s' %prestaProgressEvent.msg )
 	else:
 		print( '%i/%i - %s' % ( prestaProgressEvent.current_step, prestaProgressEvent.max_step, prestaProgressEvent.msg ) )
+
+class PrestaOut( object ):
+	""" Class to manage the ouput of data to various streams """
+
+	def __init__( self ):
+		self.fh = None # File handle
+		self.filename = ''  #  filename for the file handle 
+
+	def writeln( self, obj ):
+		print( obj )
+		if self.fh != None:
+			self.fh.write( obj )
+			self.fh.write(  '\n' )
+
+	def write_lines( self, lines ):
+		""" just write all the lines contained in the list """
+		for l in lines:
+			self.writeln( l )
+
+	def open_temp_file( self ):
+		""" Open temportary file to write output content.
+		    Later, this file will be used to content to the printer :-)
+
+			:returns: the openned temporary filename
+		"""
+		if self.fh:
+			return self.filename
+
+		# Create a new temporary file
+		self.filename = tempfile.mktemp( '-console-print.txt' )
+		self.fh = open( self.filename, 'w' )
+		return self.filename
+
+	def close_temp_file( self ):
+		""" just close the temporary file. 
+
+			:returns: the just closed temporary filename. """
+		if not self.fh:
+			raise Exception( 'No printer file open!' )
+		_r = self.filename 
+		self.fh.close()
+		self.fh = None
+		self.filename = None
+		return _r
+
+
 
 
 class BaseApp( object ):
@@ -154,6 +170,7 @@ class BaseApp( object ):
 		self.config = Config()
 		self.KEYWORDS = keywords
 		self.COMMANDS = commands
+		self.output = PrestaOut()
 
 
 		# initialize the logging
@@ -199,7 +216,7 @@ class BaseApp( object ):
 		    not( any([item for item in self.COMMANDS if item[0]==params[0]]) ): # Note: somes command makes only one word (and are not keyword)
 			# we are looking for product OR having a product ID
 			if params[0].isdigit(): # it is an ID
-				params.insert(0, 'print')
+				params.insert(0, 'label')
 				params.insert(1, 'product')
 			else:  # it is a string ... so a product search
 				params.insert(0, 'list')
@@ -255,10 +272,10 @@ class BaseApp( object ):
 		for value in lst:
 			try:
 				value = value.replace('\r','').replace('\n','')
-				print( '> %s' % value )
+				self.output.writeln( '> %s' % value )
 				self.evaluate_line( value )
 			except Exception as err:
-				print( '[ERROR] %s' % err )
+				self.output.writeln( '[ERROR] %s' % err )
 				if self.cachedphelper.debug:
 					traceback.print_exc()
 
@@ -269,10 +286,10 @@ class BaseApp( object ):
 			try:
 				value = raw_input( '> ' )
 				self.evaluate_line( value )
-				print('')
+				self.output.writeln('')
 
 			except Exception as err:
-				print( '[ERROR] %s' % err )
+				self.output.writeln( '[ERROR] %s' % err )
 				if self.cachedphelper.debug:
 					traceback.print_exc()
 
@@ -287,7 +304,7 @@ KEYWORDS = {
 	'product' : ['prod','arti', 'article'],
 	'supplier': ['sup', 'supp', 'four'],
 	'ean'     : ['ean'],
-	'print'   : ['prn'],
+	'label'   : ['lb'],
 	'reload'  : ['r'], # reload the data
 	'update'  : ['u'], # update stock quantities
 	'quit'    : ['q', 'exit'],
@@ -295,7 +312,7 @@ KEYWORDS = {
 	'stock'   : ['s'],
 	'1'       : ['true'],
     '0'       : ['false'],
-	None      : ['to', 'from'] # remove any from and to
+	None      : ['from'] # remove any from and to
 
 }
 
@@ -307,19 +324,29 @@ COMMANDS = [
 	('help command'   , 0   ),
 	('help'           , 0   ),
     ('list product'   , '+' ),  
-	('list supplier'  , '*' ), 
-	('print product'  , 1   ), 
-	('print small'    , 0   ),
-	('print large'    , 0   ),
-	('print king'     , 0   ),
-	('print war'      , 0   ),
-	('print vat'      , 0   ),
+	('list supplier'  , '*' ),
+	('bag clear'      , 0   ), 
+	('bag'            , 0   ),
+	('editor begin'   , 0   ),
+	('editor end'     , 0   ),
+	('editor once'    , 0   ),
+	('editor abort'   , 0   ),
+	('label product'  , 1   ), 
+	('label small'    , 0   ),
+	('label large'    , 0   ),
+	('label king'     , 0   ),
+	('label war'      , 0   ),
+	('label vat'      , 0   ),
+	('print once'     , 0   ),
+	('print begin'    , 0   ),
+	('print end'      , 0   ),
+	('print abort'    , 0   ),
 	('quit'           , 0   ),
 	('reload stock'   , 0   ),
 	('reload'         , 0   ),
 	('save'           , 0   ),
 	('set debug'      , 1   ),
-	('set option'     , 2   ),
+	('set'            , 2   ),
 	('show debug'     , 0   ),
 	('show option'    , '*' ),
 	('show stat'      , 0   ),
@@ -332,13 +359,23 @@ class App( BaseApp ):
 
 	def __init__( self ):
 		super( App, self ).__init__( KEYWORDS, COMMANDS )
+		self.bag                = ToteBag()
 		self.ID_SUPPLIER_PARAMS = None  # LABEL Size is stored into the article reference of the "PARAMS" supplier.
+		self.print_once         = False
+		self.editor_once        = False
 		 # Maintains the application options
 		self.options = { 'show-product-pa'   : '1',
 						 'show-product-pv'   : '1',
 						 'show-product-label': '0',
+						 'show-product-qm'   : '0',
+						 'show-product-qo'   : '0',
 						 'inactive-product'  : '0',
-						 'include-it'        : '0'
+						 'include-it'        : '0',
+						 'print-landscape'   : '1',
+						 'print-cpi'         : '12',
+						 'print-lpi'         : '7',
+						 'print-sides'       : 'one-sided',
+						 'editor'			 : 'pluma'
 					   }
 
 		# Init params from load data
@@ -372,18 +409,79 @@ class App( BaseApp ):
 		for item in lst:
 			vals = item.split(':')
 			if len( vals )!= 2:
-				raise Exception( 'Invalid product PARAMS "%s" in "%s". it must have 2 parts (colon separated!)' % (vals, reference) )
+				raise Exception( 'Invalid product PARAMS "%s" in "%s" for id_product %s. it must have 2 parts (colon separated!)' % (vals, reference,id_product) )
 			result[vals[0]] = vals[1]
 		
 		return result
 
+	def get_qm_info( self, psr ):
+		""" generate the 'Quantity Minimum Warning' message for a given product.
+
+			:param psr: ProductSearchResult item for whom the QM Warning should be computed.
+			:return: tuple of ( qm_value, qm_warning_message ) value. Note that qm_warning is empty string when there is no warning. 
+		"""
+		# Attempt to retreive QM
+		_params = self.get_product_params( psr.product_data.id )
+		# The QM value
+		_qm = None
+		if 'QM' in _params:
+			try:
+				_qm = int(_params['QM'])
+				value1 = _qm
+			except:
+				value1 = '???'
+		else:
+			value1 = '---'
+		# The QM warning value
+		if psr.qty <= 0:
+			value2 = '%s' % psr.qty 
+		elif _qm and (psr.qty < _qm):
+			value2 = '!!!'
+		else:
+			value2 = ''
+
+		return (value1, value2) # QM_value, QM_Warning_Message 
+
+	def get_qo_info( self, psr ):
+		""" grab the 'Quantity Order' information for a given product.
+
+			:param psr: ProductSearchResult item for whom the QM Warning should be computed.
+			:return: QO value 
+		"""
+		# Attempt to retreive QO
+		_params = self.get_product_params( psr.product_data.id )
+		# The QO value
+		if 'QO' in _params:
+			try:
+				_qo = int(_params['QO'])
+				value1 = _qo
+			except:
+				value1 = '???'
+		else:
+			value1 = '---'
+
+		return value1 # QO_value
+
 	def output_product_search_result( self, psr_list ):
-		""" output the list of product (ProductSearchResult list). The default destination is the screen (but may vary depending on options) """
+		""" output the list of product (ProductSearchResult list). The default destination is the screen (but may vary depending on options) 
+
+		:param psr_list: a ProductSearchResult list of a ToteBag (also a list) """
 		if len( psr_list )<=0:
 			return
 
-		sTitle = '%7s | %-30s | %5s' % ('ID', 'Reference', 'qty' )
-		sPrint = '%7i | %-30s | %5i'
+		sTitle = ''
+		sPrint = ''
+		if isinstance( psr_list[0], ToteItem ):
+			sTitle += '%7s | ' % 'ordered'
+			sPrint += '%7i | '	
+		sTitle += '%7s | %-30s | %5s' % ('ID', 'Reference', 'stock' )
+		sPrint += '%7i | %-30s | %5i'
+		if self.options['show-product-qm']=='1':
+			sTitle += ' | %5s | %3s' % ('QM', '/!\\' )
+			sPrint += ' | %5s | %3s'
+		if self.options['show-product-qo']=='1':
+			sTitle += ' | %5s' % 'QO'
+			sPrint += ' | %5s'			
 		if self.options['show-product-label'] == '1':
 			sTitle += ' | %-50s' % 'Label'
 			sPrint += ' | %-50s'
@@ -396,20 +494,56 @@ class App( BaseApp ):
 		sTitle += ' | %-20s' % 'Supp. Ref.'
 		sPrint += ' | %-50s'
 
-		show_IT_product = self.options['include-it'] == '1'
-		show_inactive   = self.options['inactive-product'] == '1'
 
-		print( sTitle )
-		print( '-'*len(sTitle))
+		self.output.writeln( sTitle )
+		self.output.writeln( '-'*len(sTitle))
 		_count = 0
 		for psr in  psr_list : # Returns a list of ProductSearchResult
-			if psr.product_data.is_IT and not(show_IT_product):
-				continue
-			if (psr.product_data.active==0) and not(show_inactive):
-				continue 
+			# If it isn't a ProductSearchResult, we will have to Mimic it!
+			if isinstance( psr, ProductSearchResult ):
+				pass
+			elif isinstance( psr, ToteItem ):
+				_item = psr # remind old ToteItem reference 
+				psr = self.cachedphelper.psr_instance( _item.product )
+				psr.ordered_qty = _item.qty # set the ordered qty from ToteBag
 
-			# prepare the data
-			_lst = [psr.product_data.id, psr.product_data.reference, psr.qty ]
+			# --- prepare the data ---
+			_lst = []
+			# Order QTY come from ToteBag
+			if psr.ordered_qty:  
+				_lst.append( psr.ordered_qty )
+
+			# ID, Ref, QTY
+			_lst = _lst + [psr.product_data.id, psr.product_data.reference, psr.qty ]
+			
+			# Minimal Quantity
+			if self.options['show-product-qm']=='1':
+				# Get 'Quantity Minimal', 'Quantity Minimal Warning' text
+				QM, sQM_Warning = self.get_qm_info( psr )
+				_lst.append( QM )
+				_lst.append( sQM_Warning )
+				# Attempt to retreive QM
+				#_params = self.get_product_params( psr.product_data.id )
+				#_qm = None
+				#if 'QM' in _params:
+				#	try:
+				#		_qm = int(_params['QM'])
+				#		_lst.append( _qm )
+				#	except:
+				#		_lst.append( '???')
+				#else:
+				#	_lst.append(  '---' )
+				# Display QM warning column
+				#if psr.qty <= 0:
+				#	_lst.append( '%s' % psr.qty )
+				#elif _qm and (psr.qty < _qm):
+				#	_lst.append( '!!!' )
+				#else:
+				#	_lst.append( '' )
+			if self.options['show-product-qo']=='1':
+				QO = self.get_qo_info( psr )
+				_lst.append( QO )
+
 			if self.options['show-product-label'] == '1':
 				_lst.append( psr.product_data.name )
 			if self.options['show-product-pa'] == '1':
@@ -420,10 +554,10 @@ class App( BaseApp ):
 			_lst.append( psr.supplier_refs )
 
 			# Go for display
-			print( sPrint % tuple( _lst ) )
+			self.output.writeln( sPrint % tuple( _lst ) )
 			_count += 1
 
-		print( '%s items in result' % _count )
+		self.output.writeln( '%s items in result' % _count )
 
 			#print( '%7i : %s : %5i : %s - %s' % ( \
 			#	psr.product_data.id, \
@@ -432,11 +566,50 @@ class App( BaseApp ):
 			#	psr.product_data.name.ljust(50), \
 			#	psr.supplier_refs ) )
 
+	def evaluate_line( self, value ):
+		_print_once = self.print_once # was it activated before the command execution
+		_editor_once = self.editor_once
+
+		# Bag manipulation command ?
+		if self.bag.is_bag_command( value ):
+			# returns text line to displays
+			lines = self.bag.manipulate( self.cachedphelper, value )
+			self.output.write_lines( lines )
+		else:
+			# Standard command execution
+			super( App, self ).evaluate_line( value )
+		if _print_once:
+			self.do_print_end( params = {} )
+		if _editor_once:
+			self.do_editor_end( params = {} )
+
 	# ---------------------------------------------------------------------------
 	#
 	#   COMMANDs execution
 	#
 	# ---------------------------------------------------------------------------
+	def do_bag( self, params ):
+		""" View the content of the bag (shopping basket """
+		#def view_bag( cachedphelper, bag, max_row=None, desc=False ):
+
+		#_desc = False # Display in descending order
+
+		if len( self.bag )==0:
+			self.output.writeln(  '(empty bag)' )
+		else:
+			self.output_product_search_result( psr_list = self.bag )
+
+		#for idx, item in enumerate( reversed(self.bag) if _desc else self.bag ):
+		#	#if max_row and (idx>=max_row):
+		#	#	print( '> ...' ) # indicates the presence of more items in the bag
+		#	#	break;
+		#	xxx
+		#	print( '%3i x %7i : %s - %s' % (item.qty, item.product.id,item.product.reference.ljust(30),item.product.name) ) 	
+
+	def do_bag_clear( self, params ):
+		self.bag.clear()
+
+
 	def do_ean( self, params ):
 		""" Generates the EAN13 for the ID_Product """
 		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
@@ -444,7 +617,28 @@ class App( BaseApp ):
 		_id = int( params[0] )
 		product_ean = '32321%07i' % _id  # prefix 3232 + product 1 + id_product
 		product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
-		print( '%s' % product_ean )				
+		self.output.writeln( '%s' % product_ean )	
+
+	def do_editor_begin( self, params ):
+		print( 'editor file %s created' % self.output.open_temp_file() )
+
+	def do_editor_end( self, params ):
+		filename = self.output.close_temp_file()
+		print( 'Editing %s ...' % filename )
+		cmd = '%s %s &' % (self.options['editor'], filename) 
+		self.editor_once = False;
+
+		os.system( cmd )
+		# raise Exception('failed to execute %s')
+
+	def do_editor_once( self, params ):
+		self.editor_once = True
+		self.do_editor_begin( params )
+
+	def do_editor_abort( self, params ):
+		self.editor_once  = False
+		self.output.close_temp_file()
+		raise Exception( 'Editor file aborted!' )					
 
 	def do_help( self, params ):
 		""" Display Help """
@@ -455,13 +649,35 @@ class App( BaseApp ):
 		kw = params[0].lower()
 		if not kw in self.KEYWORDS:
 			raise ValueError( '%s is not a valid keyword!' % kw )
-		print( '"%s" equivalence are %s' % (kw, ', '.join( self.KEYWORDS[kw])) )
+		self.output.writeln( '"%s" equivalence are %s' % (kw, ', '.join( self.KEYWORDS[kw])) )
 
 	def do_help_command( self, params ):
 		""" Display list of commands """
 		for cmd, param_count in self.COMMANDS:
-			print( "%s %s" % (cmd, "<%s>" % param_count if param_count!=0 else "" ) )
+			self.output.writeln( "%s %s" % (cmd, "<%s>" % param_count if param_count!=0 else "" ) )
 
+	def do_label_small( self, params ):
+		handle_print_custom_label_small()
+
+	def do_label_king( self, params ):
+		handle_print_custom_label_king()
+
+	def do_label_large( self, params ):
+		handle_print_custom_label_large()
+
+	def do_label_product( self, params ):
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
+
+		_id = int( params[0] )
+		_product = self.cachedphelper.products.product_from_id( _id )
+		handle_print_for_product( _product, self.get_product_params( _id ) )
+
+	def do_label_war( self, params ):
+		handle_print_warranty_label_large()
+
+	def do_label_vat( self, params ):
+		handle_print_vat_label_large()
+	
 	def do_list_product( self, params ):
 		""" Search for a product base on its partial reference code + list them """
 		assert len(params)>0 and isinstance( params[0], str ), 'the parameter must be a string'
@@ -475,25 +691,53 @@ class App( BaseApp ):
 			result = self.cachedphelper.search_products_from_label( key[1:], include_inactives = True ) # Skip the *
 		else:
 			result = self.cachedphelper.search_products_from_partialref( key, include_inactives = True )
-		
+
+		show_IT_product = self.options['include-it'] == '1'
+		show_inactive   = self.options['inactive-product'] == '1'		
+		# Remove item that are ITs
+		if not( show_IT_product ):
+			result.filter_out( lambda psr: psr.product_data.is_IT )
+		# Remove item that are inactive (but preserve ITs which are always inactives)
+		if not( show_inactive ):
+			result.filter_out( lambda psr: psr.product_data.active==0  and not(psr.product_data.is_IT) )
 		self.output_product_search_result( psr_list = result )
 
 
 	def do_list_supplier( self, params ):
 		""" Show the list of suppliers (or product inside the supplier if only one produc) """
-		def show_product_list( id_supplier ):
+		def show_product_list( id_supplier, extra_params ):
+			""" Display the list of supplier products
+
+			:param id_supplier: identifier of the supplier to list out.
+			:param extra_params: le parameters behind "list product <PARAMS>". order will reduce the list 'QM Warning' products
+			""" 
 			# build the product list
-			print( '='*30 )
-			print( '    %s supplier list (%i)' % (self.cachedphelper.suppliers.supplier_from_id(id_supplier).name, id_supplier)  )
-			print( '='*30 )
+			self.output.writeln( '='*40 )
+			self.output.writeln( '    %s supplier list (%i)' % (self.cachedphelper.suppliers.supplier_from_id(id_supplier).name, id_supplier)  )
+			self.output.writeln( '='*40 )
 			psr_lst = self.cachedphelper.search_products_from_supplier( id_supplier, include_inactives=(self.options['inactive-product']=='1') )
+			# also include ITs product
+			psr_lst2 = self.cachedphelper.search_products_from_supplier( id_supplier, include_inactives=True, filter = lambda product : product.is_IT )
+			psr_lst.merge( psr_lst2 )
+			if 'order' in extra_params:
+				# Remove all items that are not initiating QM Warning 
+				psr_lst.filter_out( lambda psr : self.get_qm_info(psr)[1] == '' )
 			sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
 			self.output_product_search_result( psr_list = sorted_lst )
 
+
+		# Collect all extra parameter after "list supplier <PARAM>" "
+		if len( params )>1:
+			extra_params = list( [ p.lower() for p in params[1:] ] )
+		else:
+			extra_params = []
+
+
+		# List product <PARAM> with <PARAM> as digit or text
 		if ( len(params)>0 ) and ( params[0].isdigit() ):
 			# we have an ID Supplier in parameter --> Show the products
 			id_supplier = int( params[0] )
-			show_product_list( id_supplier )
+			show_product_list( id_supplier, extra_params )
 		else:
 			# Sort the list
 			sorted_lst = sorted( self.cachedphelper.suppliers, key=lambda item:item.name.lower() )
@@ -502,70 +746,81 @@ class App( BaseApp ):
 				_lst = [ item for item in sorted_lst if params[0].lower() in item.name.lower() ]
 			else:
 				_lst = sorted_lst
-			# show the list of supplier
-			for sup in _lst:
-				print(  '%4i : %s ' % (sup.id, sup.name) )
+
 			# show product list (if only one supplier returned)
 			if len( _lst )==1:
 				id_supplier = int( _lst[0].id )
-				show_product_list( id_supplier )	
+				show_product_list( id_supplier, extra_params )
+				return
 
-	def do_print_small( self, params ):
-		handle_print_custom_label_small()
+			# show the list of supplier
+			for sup in _lst:
+				self.output.writeln(  '%4i : %s ' % (sup.id, sup.name) )	
 
-	def do_print_king( self, params ):
-		handle_print_custom_label_king()
+	def do_print_begin( self, params ):
+		print( 'print file %s created' % self.output.open_temp_file() )
+		dt = datetime.date.today()
+		self.output.writeln( 'date %s' % dt.strftime("%d/%m/%Y") )
 
-	def do_print_large( self, params ):
-		handle_print_custom_label_large()
+	def do_print_end( self, params ):
+		filename = self.output.close_temp_file()
+		print( 'printing %s ...' % filename )
+		cmd = 'lp -o media=A4 '
+		if self.options['print-landscape']=='1':
+			cmd += '-o landscape '
+		cmd += '-o cpi='+self.options['print-cpi']+' '
+		cmd += '-o lpi='+self.options['print-lpi']+' '
+		cmd += '-o sides='+self.options['print-sides']+' '
+		cmd += filename 
 
-	def do_print_product( self, params ):
-		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
+		self.print_once = False;
 
-		_id = int( params[0] )
-		_product = self.cachedphelper.products.product_from_id( _id )
-		handle_print_for_product( _product, self.get_product_params( _id ) )
+		os.system( cmd )
+		# raise Exception('failed to execute %s')
 
-	def do_print_war( self, params ):
-		handle_print_warranty_label_large()
+	def do_print_once( self, params ):
+		self.print_once = True
+		self.do_print_begin( params )
 
-	def do_print_vat( self, params ):
-		handle_print_vat_label_large()
+	def do_print_abort( self, params ):
+		self.print_once  = False
+		self.output.close_temp_file()
+		raise Exception( 'Print file aborted!' )
 
 	def do_quit( self, params ):
-		print( "User exit!")
+		self.output.writeln( "User exit!")
 		sys.exit(0)
 
 	def do_reload( self,  params ):
 		""" Reload ALL the data from the WebShow """
-		print( 'Contacting WebShop and reloading...' )
+		self.output.writeln( 'Contacting WebShop and reloading...' )
 		self.cachedphelper.load_from_webshop()
 		self.__init_from_loaded_data() # reinit global variables
 
 	def do_reload_stock( self, params ):
 		""" Reload the stock quantities only. """
-		print( 'Refreshing stock quantities...' )
+		self.output.writeln( 'Refreshing stock quantities...' )
 		self.cachedphelper.refresh_stock()
 
 	def do_save( self, params ):
 		""" Save the memory data to the cache file """
-		print( 'Saving cache...' )
+		self.output.writeln( 'Saving cache...' )
 		self.cachedphelper.save_cache_file()
 
 	def do_show_debug( self, params ):
 		""" Show lot of information for inner debugging """
-		print( 'debug              : %s' % ('True' if self.cachedphelper.debug else 'false') )
-		print( 'last product id    : %s' % self.cachedphelper.products.last_id )
+		self.output.writeln( 'debug              : %s' % ('True' if self.cachedphelper.debug else 'false') )
+		self.output.writeln( 'last product id    : %s' % self.cachedphelper.products.last_id )
 
-		print( 'PARAMS id_supplier : %i' % self.ID_SUPPLIER_PARAMS )
-		print( 'list of option     :' )
+		self.output.writeln( 'PARAMS id_supplier : %i' % self.ID_SUPPLIER_PARAMS )
+		self.output.writeln( 'list of option     :' )
 		self.do_show_option( params=[], prefix='      ')
 
 	def do_set_debug( self, params ):
 		""" Toggle the debug flag """
 		self.cachedphelper.debug = (params[0] == '1')
 
-	def do_set_option( self, params ):
+	def do_set( self, params ):
 		""" Update the value of an option """
 		sName = params[0]
 		sValue = params[1]
@@ -582,24 +837,24 @@ class App( BaseApp ):
 		""" Show the console option (all or the mentionned one) """
 		if len(params)>0:
 			if params[0] in self.options:
-				print( prefix+'%-20s = %s' % (params[0], self.options[params[0]]) )
+				self.output.writeln( prefix+'%-20s = %s' % (params[0], self.options[params[0]]) )
 			else:
 				raise ValueError( '%s is not a valid option' % params[0] )
 		else:
 			# show all params	
 			for key_val in self.options.iteritems():
-				print( prefix+'%-20s = %s' % key_val )
+				self.output.writeln( prefix+'%-20s = %s' % key_val )
 
 	def do_show_stat( self, params ):
 		""" Display the cachec helper statistics """
-		print( '%6i Carriers' % len(self.cachedphelper.carriers) )
-		print( '%6i OrderStates' % len( self.cachedphelper.order_states ) )
-		print( '%6i Products' % len( self.cachedphelper.products ) )
-		print( '%6i suppliers' % len( self.cachedphelper.suppliers ) )
-		print( '%6i categories' % len( self.cachedphelper.categories ) )
-		print( '%6i stock availables' % len( self.cachedphelper.stock_availables ) )
-		print( '%6i product suppliers available' % len( self.cachedphelper.product_suppliers ) )
-		print( '%6i last product id' % self.cachedphelper.products.last_id )
+		self.output.writeln( '%6i Carriers' % len(self.cachedphelper.carriers) )
+		self.output.writeln( '%6i OrderStates' % len( self.cachedphelper.order_states ) )
+		self.output.writeln( '%6i Products' % len( self.cachedphelper.products ) )
+		self.output.writeln( '%6i suppliers' % len( self.cachedphelper.suppliers ) )
+		self.output.writeln( '%6i categories' % len( self.cachedphelper.categories ) )
+		self.output.writeln( '%6i stock availables' % len( self.cachedphelper.stock_availables ) )
+		self.output.writeln( '%6i product suppliers available' % len( self.cachedphelper.product_suppliers ) )
+		self.output.writeln( '%6i last product id' % self.cachedphelper.products.last_id )
 
 	def do_upgrade( self, params ):
 		""" Just upgrade the software from GitHub depot. """
@@ -607,6 +862,8 @@ class App( BaseApp ):
 			raise Exception( 'git fetching failure!' )
 		if os.system( 'git pull' )!=0:
 			raise Exception( 'git pulling failure!')
+		else:
+			self.output.writeln( 'Update complete. Restart the console!' )
 
 
 def main():
