@@ -1,0 +1,5 @@
+reload stock
+set print-cpi 15
+set print-lpi 9
+set show-product-qm true
+set debug false
