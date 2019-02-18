@@ -105,14 +105,14 @@ def handle_print_for_product( product, params, separator=False ):
 				
 		if label_size == 'small':
 			if separator:
-				print_custom_label_small( '='*24, ['%s x' % value, product.reference ], 1 )
+				print_custom_label_small( '='*24, [u'%s x' % value, product.reference ], 1 )
 			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
 			print_product_label_medium( product.id, product.reference, product.ean13, int(value) )
 			return True
 		else:
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			if separator:
-				print_custom_label_large(  '='*24, ['%s x' % value, product.reference ], 1 ) 
+				print_custom_label_large(  '='*24, [u'%s x' % value, product.reference ], 1 ) 
 			print_product_label_large( product.id, product.reference, product.ean13, int(value) )	 
 			return True
 
