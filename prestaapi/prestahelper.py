@@ -1544,6 +1544,12 @@ class ProductData( BaseData ):
 		""" Check if the product is an [IT] product """
 		return '[INTERNAL]' in self.name
 
+	@property
+	def price_ttc(self):
+		""" Calculate the price TTC """
+		return self.price * (1.06 if 'BK-' in self.reference else 1.21)
+	
+
 class StockAvailableData( BaseData ):
 	""" Contains the Stock_Available description data """
 	__slots__ = ["id", "id_product", "depends_on_stock", "out_of_stock", "quantity" ]
