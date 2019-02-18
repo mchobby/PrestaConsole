@@ -55,13 +55,14 @@ def request_qty( prompt = 'How many items ?'):
 			return	None
 	return qty
 		
-def handle_print_for_product( product, params ):
+def handle_print_for_product( product, params, separator=False ):
 	""" Manage the tickect printing for an ID product.
 		May ask additionnal questions on on input
 
 		:param product: the ProductData object to print
 		:param params: the product parameter dictionnary (extracted from PARAMS supplier)  
-
+		:param seperator: Print a separator label before the product print 
+		:return: True if something has been printed
 		"""
 	# item = cachedphelper.products.product_from_id( id )
 	assert product
@@ -81,34 +82,39 @@ def handle_print_for_product( product, params ):
 		if len(value)==0:
 			value = '1'
 		if value=='0':
-			return
+			return False
 			
 		if value=='+': # change label size
 			label_size = 'large' if label_size == 'small' else 'small'
 			continue 
 		if value=='+q': #user abord
-			return 
+			return False
 			
 		if not value.isdigit():
 			print( '%s is not a numeric value' % value )
-			return
+			return False
 		
 		if int(value) > 25:
 			value2 = raw_input( 'Quantity > 25! Please confirm: ' )
 			if not value2.isdigit():
 				print( '%s is not a numeric value, ABORT!' % value2 )
-				return
+				return False
 			elif int(value2) != int(value):
 				print( 'inconsistant quantities %s & %s' % (value, value2) )
-				return
+				return False
 				
 		if label_size == 'small':
+			if separator:
+				print_custom_label_small( '='*24, ['%s x' % value, product.reference ], 1 )
 			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
 			print_product_label_medium( product.id, product.reference, product.ean13, int(value) )
+			return True
 		else:
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
+			if separator:
+				print_custom_label_large(  '='*24, ['%s x' % value, product.reference ], 1 ) 
 			print_product_label_large( product.id, product.reference, product.ean13, int(value) )	 
-		return
+			return True
 
 def handle_print_custom_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
