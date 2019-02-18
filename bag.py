@@ -24,6 +24,7 @@ MA 02110-1301, USA.
 """  
 
 import re
+import xml.etree.cElementTree as etree
 
 RE_ADD_REMOVE_SEVERAL_ID= "^(\+|\-)(\d+)\*(\d+)$"          # +3*125 OU -4*1024
 RE_ADD_REMOVE_SEVERAL_TEXT = "^(\+|\-)(\d+)\*([a-zA-Z].+)$" # +3*gsm OU +3*g125 OU -2xdemo
@@ -131,6 +132,51 @@ class ToteBag( list ):
 					       [ '%7i : %s - %s' % (item.product_data.id,item.product_data.reference.ljust(30),item.product_data.name) for \
 					         item in cachedphelper.search_products_from_partialref( txt, include_inactives = False ) \
 					       ] )
+
+	def export_to_xmltree( self, decimal_separator=',' ):
+		""" Export the content of a Tote Bag into an XML structure """
+		root = etree.Element( 'tote-bag' )
+		for tote_item in self:
+			item = etree.SubElement( root, "tote-item" )
+
+	        # __slots__ = ["id", "active", "reference", "name", "wholesale_price",
+	        #     "price", "id_supplier", "id_category_default", "advanced_stock_management", 
+	        #     "available_for_order", "ean13" ]
+
+			# add values for the Row
+			etree.SubElement( item, "id" ).text = "%s" % tote_item.product.id
+			etree.SubElement( item, "libelle" ).text = "%s" % tote_item.product.name
+			etree.SubElement( item, "reference" ).text = "%s" % tote_item.product.reference
+			etree.SubElement( item, "quantite"  ).text = "%s" % tote_item.qty	
+			etree.SubElement( item, "PVHT_par_P").text = ("%s" % tote_item.product.price).replace('.', decimal_separator)	
+			etree.SubElement( item, "Total_PVHT").text = '---'
+			etree.SubElement( item, "PAHT_P"    ).text = ("%s" % tote_item.product.wholesale_price).replace('.', decimal_separator)	 
+			etree.SubElement( item, "Reduction" ).text = "0 %"
+			etree.SubElement( item, "PV2_PV_Red").text = '---'	
+			etree.SubElement( item, "Marge"     ).text = '---'	
+			etree.SubElement( item, "Total_PAHT").text = '---'	
+			etree.SubElement( item, "Total_PV2"	).text = '---' 
+			etree.SubElement( item, "TVA"       ).text = 'todo'	
+			etree.SubElement( item, "Total_TTC" ).text = '---'
+		return root
+
+	def import_from_xmltree( self, cachedphelper, xml_root ):
+		""" Enumerate XML tree and reload products in the Tote-Bag
+
+			:param cachedphelper: used to retreives the product reference
+			:param xml_root: xml root node 
+		"""
+		for item in xml_root.iter('tote-item'):
+			ref = item.find('reference').text # référence produit
+			id  = int( item.find('id').text )
+			qty = int( item.find('quantite').text )
+			# Find the produt
+			p = cachedphelper.products.product_from_id( id )
+			if p:
+				self.add_product( qty, p )
+			else:
+				raise Exception( '[ERROR] unable to reload product ID %i for reference %s' %(id,ref) )
+
 
 class ToteItem( object ):
 	__slots__ = '_bag', 'qty', 'product'
