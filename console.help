@@ -20,8 +20,10 @@ The keyword equivalence can be find with the command "help keyword <THE_KEYWORD>
 
 Special use-case :
 -----------------:
-Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command "list product <WORD>" (or /<WORD> or *<WORD>) and will show the results.
+Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command "list product <WORD>" (or /<WORD> or *<WORD>) and will show the results. 
 If the <WORD> only contains digits then the command is translated to "print product <WORD>" and print the product label.
+
+Key-in a .<ID> would ne translate to the command "show product <ID>"
 
 It also exist bag manipulation commands
 	* add/remove IDs       with +3*125 or -4*1024
@@ -63,6 +65,23 @@ GENERAL PURPOSE Commands :
 bag :
 
   Show the content of the bag (shopping basket)
+
+
+bag export :
+
+  Export the bag as XML file ready to import in LibreOffice calc.
+
+
+bag import :
+
+  Reimport the XML file into the bag.
+
+
+check stock config :
+
+  List all the product with improper stock configuration.
+  Product allowing ORDER_OUT_OF_STOCK or product with
+  stock not DEPENDS_ON_STOCK_SYNCH will be listed.
 
 
 ean <ID> :
@@ -166,6 +185,11 @@ reload stock :
   Contact the WebShop to ONLY RELOAD the stock quantities
 
 
+show product <ID> :
+
+  Show the details about the <ID> product
+
+
 save :
 
   save the current data to the cache file.
@@ -218,6 +242,12 @@ include-it           (0 = inactive by default)
 
     Include the [IT] products in the product search.
 
+
+label-separator      (0 = inactive by default)
+
+    Print a separator label after product label print.
+
+
 landscape            (1 = ACTIVE by default)
 
     Print in landscape format with print command.
@@ -259,6 +289,7 @@ print-lpi           (7 by default)
 
     line per inch. use lpi = 6 for bigger text.
     Use lpi = 9 fpr smaller text (or even 12)
+
 
 print-sides          ('one-sided' by default)
 

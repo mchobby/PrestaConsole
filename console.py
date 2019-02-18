@@ -27,7 +27,7 @@ MA 02110-1301, USA.
 import warnings 
 warnings.filterwarnings("ignore")
 
-from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult
+from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
 from pprint import pprint
@@ -43,7 +43,7 @@ import datetime
 from bag import ToteBag, ToteItem
 
 try:
-	#from Tkinter import *
+	from Tkinter import *
 	import Tkinter, Tkconstants, tkFileDialog
 except Exception as err:
 	print( '[ERROR] Unable to load TKinter dependencies! %s' % err )
@@ -218,6 +218,10 @@ class BaseApp( object ):
 			if params[0].isdigit(): # it is an ID
 				params.insert(0, 'label')
 				params.insert(1, 'product')
+			elif  (params[0].find('.')==0) and ( params[0][1:].isdigit() ): # Start with a point and contains digit... it is a show product <ID>
+				params[0] = params[0][1:] # Keep the ID (remove the dot)
+				params.insert( 0, 'show' )
+				params.insert( 1, 'product' )
 			else:  # it is a string ... so a product search
 				params.insert(0, 'list')
 				params.insert(1, 'product')
@@ -323,10 +327,11 @@ COMMANDS = [
 	('help keyword'   , 1   ),
 	('help command'   , 0   ),
 	('help'           , 0   ),
-    ('list product'   , '+' ),  
-	('list supplier'  , '*' ),
 	('bag clear'      , 0   ), 
+	('bag export'     , 0   ),
+	('bag import'     , 0   ),
 	('bag'            , 0   ),
+	('check stock config',0 ),
 	('editor begin'   , 0   ),
 	('editor end'     , 0   ),
 	('editor once'    , 0   ),
@@ -337,6 +342,8 @@ COMMANDS = [
 	('label king'     , 0   ),
 	('label war'      , 0   ),
 	('label vat'      , 0   ),
+    ('list product'   , '+' ),  
+	('list supplier'  , '*' ),
 	('print once'     , 0   ),
 	('print begin'    , 0   ),
 	('print end'      , 0   ),
@@ -349,6 +356,7 @@ COMMANDS = [
 	('set'            , 2   ),
 	('show debug'     , 0   ),
 	('show option'    , '*' ),
+	('show product'   , 1   ),
 	('show stat'      , 0   ),
 	('upgrade'        , 0   )
 	]
@@ -371,6 +379,7 @@ class App( BaseApp ):
 						 'show-product-qo'   : '0',
 						 'inactive-product'  : '0',
 						 'include-it'        : '0',
+						 'label-separator'   : '0',
 						 'print-landscape'   : '1',
 						 'print-cpi'         : '12',
 						 'print-lpi'         : '7',
@@ -550,7 +559,7 @@ class App( BaseApp ):
 				_lst.append( psr.product_data.wholesale_price )
 			if self.options['show-product-pv'] == '1':
 				_lst.append( psr.product_data.price )
-				_lst.append( psr.product_data.price * (1.06 if 'BK-' in psr.product_data.reference else 1.21) )
+				_lst.append( psr.product_data.price_ttc )
 			_lst.append( psr.supplier_refs )
 
 			# Go for display
@@ -603,11 +612,63 @@ class App( BaseApp ):
 		#	#if max_row and (idx>=max_row):
 		#	#	print( '> ...' ) # indicates the presence of more items in the bag
 		#	#	break;
-		#	xxx
+		#	
 		#	print( '%3i x %7i : %s - %s' % (item.qty, item.product.id,item.product.reference.ljust(30),item.product.name) ) 	
 
 	def do_bag_clear( self, params ):
 		self.bag.clear()
+
+	def do_bag_export( self, params ):
+		""" Export the bag to an XML file (to be imported into LibreOffice) """
+		# export the bag
+		root = self.bag.export_to_xmltree()
+		tree = etree.ElementTree( root )
+
+		root = Tk()
+		root.filename = tkFileDialog.asksaveasfilename(initialdir = self.config.tote_bag_export_path,title = "Exporter vers fichier XML",filetypes = (("xml","*.xml"),("all files","*.*")))
+		if (root.filename == u'') or (root.filename == self.config.tote_bag_export_path):
+			self.output.writeln( 'User abort!')
+			root.destroy()
+			return
+		tree.write( root.filename )
+		root.destroy()
+		self.output.writeln( 'exported to %s' % root.filename )
+
+	def do_bag_import( self, params ):
+		""" Import an XML file into the nag """
+		root = Tk()
+		root.filename = tkFileDialog.askopenfilename(initialdir = self.config.tote_bag_export_path,title = "Recharger un fichier XML",filetypes = (("xml","*.xml"),("all files","*.*")))
+		if (root.filename == u'') or (root.filename == self.config.tote_bag_export_path):
+			self.output.writeln( 'User abort!')
+			root.destroy()
+			return
+		
+		tree = etree.parse( root.filename )
+		xml_root = tree.getroot()
+		# Clear the bag
+		self.bag.clear()
+		# reload content from xml into the tote-bag
+		self.bag.import_from_xmltree(self.cachedphelper, xml_root )
+		root.destroy()
+		# display information to user
+		self.output.writeln( 'reloaded from %s' % root.filename )	
+
+	def do_check_stock_config( self, params ):
+		""" Check all the product with improper stock configuration. """
+		psr_lst = ProductSearchResultList()
+		for item in self.cachedphelper.stock_availables:
+			# Not synched  -OR-  accept order while out of stock
+			if (item.depends_on_stock != 1) or (item.out_of_stock == 1) : 
+				_p = self.cachedphelper.products.product_from_id( item.id_product )
+				if _p.active == 0:
+					continue
+				_psr = ProductSearchResult( _p )
+				_psr.add_product_suppliers( self.cachedphelper.product_suppliers.suppliers_for_id_product( item.id_product ) ) 
+				_psr.qty = item.quantity
+				psr_lst.append( _psr )
+		sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
+		self.output.writeln( 'Products with improper stock configuration' )
+		self.output_product_search_result( psr_list = sorted_lst )
 
 
 	def do_ean( self, params ):
@@ -620,11 +681,11 @@ class App( BaseApp ):
 		self.output.writeln( '%s' % product_ean )	
 
 	def do_editor_begin( self, params ):
-		print( 'editor file %s created' % self.output.open_temp_file() )
+		self.output.writeln( 'editor file %s created' % self.output.open_temp_file() )
 
 	def do_editor_end( self, params ):
 		filename = self.output.close_temp_file()
-		print( 'Editing %s ...' % filename )
+		self.output.writeln( 'Editing %s ...' % filename )
 		cmd = '%s %s &' % (self.options['editor'], filename) 
 		self.editor_once = False;
 
@@ -670,7 +731,8 @@ class App( BaseApp ):
 
 		_id = int( params[0] )
 		_product = self.cachedphelper.products.product_from_id( _id )
-		handle_print_for_product( _product, self.get_product_params( _id ) )
+		handle_print_for_product( _product, self.get_product_params( _id ), separator=self.options['label-separator']=='1' )
+
 
 	def do_label_war( self, params ):
 		handle_print_warranty_label_large()
@@ -815,6 +877,36 @@ class App( BaseApp ):
 		self.output.writeln( 'PARAMS id_supplier : %i' % self.ID_SUPPLIER_PARAMS )
 		self.output.writeln( 'list of option     :' )
 		self.do_show_option( params=[], prefix='      ')
+
+	def do_show_product( self, params ):
+		_id = int( params[0] )
+		p = self.cachedphelper.products.product_from_id( _id )
+		if not( p ):
+			self.output.writeln( 'No product ID %s' % _id )
+		_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _id )
+		try:
+			_margin = (p.price-p.wholesale_price) / p.wholesale_price * 100
+		except:
+			_margin = -1
+		self.output.writeln( 'Reference  : %s' % p.reference )
+		self.output.writeln( 'Name       : %s' % p.name )
+		self.output.writeln( 'EAN        : %s' % p.ean13 )
+		self.output.writeln( 'ID         : %s  (%s)' % (p.id, 'active' if p.active==1 else 'INACTIVE') ) 
+		self.output.writeln( 'P.A. (%%)   : %6.2f (%4.1f %%)' %  (p.wholesale_price,_margin) )
+		self.output.writeln( 'P.V. (TTC) : %6.2f (%6.2f)' % ( p.price, p.price_ttc ) )
+		self.output.writeln( ' ' )
+		if _sa:
+			self.output.writeln( 'Qty        : %i ' % _sa.quantity )
+			if _sa.depends_on_stock != _sa.DEPENDS_ON_STOCK_SYNCH:
+				self.output.writeln( 'Stock Synch: NOT SYNCH !!! (manual stock)' )
+			if _sa.out_of_stock == _sa.OUT_OF_STOCK_ACCEPT_ORDER:
+				self.output.writeln( 'Out of Stock: ACCEPT ORDER !!!' )
+		#self.output.writeln( '')
+		#self.output.writeln( 'Stock Mngt    : %s' % 'yes' if p.advanced_stock_management == 1 else 'NO' )
+		#self.output.writeln( 'Avail.f.order : %s' % 'yes' if p.available_for_order == 1 else 'NO' )
+		# xxx
+
+
 
 	def do_set_debug( self, params ):
 		""" Toggle the debug flag """
