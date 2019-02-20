@@ -879,10 +879,13 @@ class App( BaseApp ):
 		self.do_show_option( params=[], prefix='      ')
 
 	def do_show_product( self, params ):
+		""" Display the details about a product ID """
 		_id = int( params[0] )
 		p = self.cachedphelper.products.product_from_id( _id )
 		if not( p ):
 			self.output.writeln( 'No product ID %s' % _id )
+			return
+
 		_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _id )
 		try:
 			_margin = (p.price-p.wholesale_price) / p.wholesale_price * 100
@@ -901,7 +904,22 @@ class App( BaseApp ):
 				self.output.writeln( 'Stock Synch: NOT SYNCH !!! (manual stock)' )
 			if _sa.out_of_stock == _sa.OUT_OF_STOCK_ACCEPT_ORDER:
 				self.output.writeln( 'Out of Stock: ACCEPT ORDER !!!' )
-		#self.output.writeln( '')
+		
+		# PARAMS
+		_p = self.get_product_params( _id )
+		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )
+
+		# Supplier Ref
+		_supp_ref = -1
+		if p.id_supplier:
+			_supp_name = self.cachedphelper.suppliers.name_from_id( p.id_supplier )
+			_supp_ref  = self.cachedphelper.product_suppliers.reference_for( p.id, p.id_supplier )
+			self.output.writeln( 'Supplier   : %s  (%s)' %  (_supp_ref, _supp_name) )
+		# other supplier refs
+		_supp_refs = self.cachedphelper.product_suppliers.suppliers_for_id_product( _id )
+		self.output.writeln( 'Suppliers  : %s' % ', '.join([ref.reference for ref in _supp_refs if ref.reference != _supp_ref  and ref.id_supplier != self.ID_SUPPLIER_PARAMS ]) )
+
+
 		#self.output.writeln( 'Stock Mngt    : %s' % 'yes' if p.advanced_stock_management == 1 else 'NO' )
 		#self.output.writeln( 'Avail.f.order : %s' % 'yes' if p.available_for_order == 1 else 'NO' )
 		# xxx
