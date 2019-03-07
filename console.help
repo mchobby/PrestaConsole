@@ -9,10 +9,10 @@ A command is composed of one or many keywords and optional paramters.
 EG: list supplier watt
 
 Paramters are usually enclosed within < > tag when describing a function.
-EG: list supplier <PARAM> 
+EG: list supplier <PARAM>
 
 
-keywords may have have many equivalents. 
+keywords may have have many equivalents.
 By example, "ls" can be used instead of "list", "prod" or "arti" can be used instead of "product".
 So "ls prod <PARAM>" is the same as "list product <PARAM>"
 
@@ -20,7 +20,7 @@ The keyword equivalence can be find with the command "help keyword <THE_KEYWORD>
 
 Special use-case :
 -----------------:
-Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command "list product <WORD>" (or /<WORD> or *<WORD>) and will show the results. 
+Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command "list product <WORD>" (or /<WORD> or *<WORD>) and will show the results.
 If the <WORD> only contains digits then the command is translated to "print product <WORD>" and print the product label.
 
 Key-in a .<ID> would ne translate to the command "show product <ID>"
@@ -45,16 +45,16 @@ This file can contains several command lines that will executed at startup.
 HELP Commands :
 ===============
 
-help : 
+help :
 
   show this help file
 
-help keyword <PARAM> : 
+help keyword <PARAM> :
 
-  show all equivalent keywords of PARAM. 
+  show all equivalent keywords of PARAM.
   Eg: help keyword list
 
-help command : 
+help command :
 
   show a list of all supported commands.
 
@@ -104,10 +104,10 @@ label product <ID> :
 
 
 label small :
-  
+
   Print custom information on small zebra label 25.4mm x 25.4mm
   Title in printed in BOLD and splitted in 2 lines (split at 24th characters).
-  Interactive command would allow to choose the number of labels. 
+  Interactive command would allow to choose the number of labels.
 
 
 label large :
@@ -125,12 +125,12 @@ label king :
 
 
 label vat :
-    
+
     Print Intracommunautary labels.
 
 
 label war :
-    
+
     Print warranty labels with prefix code + increasing numbers.
 
 
@@ -145,9 +145,9 @@ list product <PARAM> :
 list supplier :
 list supplier <PARAM> :
 list supplier <PARAM> order :
-  
+
   Show the list of suppliers or filter it on <PARAM> to reduce the list.
-  if <PARAM> is an ID or reduce the list to ONLY ONE supplier 
+  if <PARAM> is an ID or reduce the list to ONLY ONE supplier
   then it show the list of attached products.
 
   When "order" is mentionned, the list is reduced to items having a
@@ -171,19 +171,23 @@ print end :
 
 
 print abort :
-  
+
   just abort any printing recording operation.
 
 
 reload :
 
-  Contact the WebShop and reload all the data. Don't forget to save!
+  Contact the WebShop and reload all the data + auto-save it to local cache.
+
+reload only :
+
+  Reload all the data only. Deactive the auto-save to cache feature!
 
 
 reload stock :
 
   Contact the WebShop to ONLY RELOAD the stock quantities
-
+	Do not forget to "save" to write quantities to cache.
 
 show product <ID> :
 
@@ -199,7 +203,7 @@ TUNING Commands :
 =================
 
 show debug :
-  
+
   display useful information to help debugging
 
 show stat :
@@ -212,7 +216,7 @@ show option :
   show mentionned option otherwise all the options
 
 set <NAME> <VALUE> :
-  
+
   modify the option <NAME> (always lowercase, see CONSOLE OPTIONS section) with the mentionned value.
   Use 1 or 0 for boolean.
   Use '' for empty string
@@ -233,10 +237,10 @@ editor               ('pluma' by default)
 
     The text editor to start when exporting content
 
-inactive-product     (0 = inactive by default) 
+inactive-product     (0 = inactive by default)
 
     Includes the inactive products in the product search.
-  
+
 
 include-it           (0 = inactive by default)
 
@@ -267,7 +271,7 @@ show-product-pa      (1 = ACTIVE by default)
 
 show-product-pv      (1 = ACTIVE by default)
 
-    Include Selling Price in the output result. 
+    Include Selling Price in the output result.
 
 
 show-product-label   (1 = ACTIVE by default)
@@ -276,7 +280,7 @@ show-product-label   (1 = ACTIVE by default)
 
 print-landscape      (1 = ACTIVE by default)
 
-    print the content of output in landscape 
+    print the content of output in landscape
 
 
 print-cpi            (12 by default)
