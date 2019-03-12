@@ -218,7 +218,7 @@ class BaseApp( object ):
 			if params[0].isdigit(): # it is an ID
 				params.insert(0, 'label')
 				params.insert(1, 'product')
-			elif  (params[0].find('.')==0) and ( params[0][1:].isdigit() ): # Start with a point and contains digit... it is a show product <ID>
+			elif  (params[0].find('.')==0) : # Start with a point  | and ( params[0][1:].isdigit() ): # Start with a point and contains digit... it is a show product <ID>
 				params[0] = params[0][1:] # Keep the ID (remove the dot)
 				params.insert( 0, 'show' )
 				params.insert( 1, 'product' )
@@ -742,7 +742,9 @@ class App( BaseApp ):
 		handle_print_vat_label_large()
 
 	def do_list_product( self, params ):
-		""" Search for a product base on its partial reference code + list them """
+		""" Search for a product base on its partial reference code + list themself.
+
+		:return: ProductSearchResultList computed and displayed by the function. """
 		assert len(params)>0 and isinstance( params[0], str ), 'the parameter must be a string'
 		key = params[0]
 		if len( key ) < 3:
@@ -764,6 +766,8 @@ class App( BaseApp ):
 		if not( show_inactive ):
 			result.filter_out( lambda psr: psr.product_data.active==0  and not(psr.product_data.is_IT) )
 		self.output_product_search_result( psr_list = result )
+
+		return result
 
 
 	def do_list_supplier( self, params ):
@@ -887,8 +891,25 @@ class App( BaseApp ):
 		self.do_show_option( params=[], prefix='      ')
 
 	def do_show_product( self, params ):
-		""" Display the details about a product ID """
-		_id = int( params[0] )
+		""" Display the details about a given product ID (int).
+		    Also accept /xxx or  *zzzz  instead of the ID.
+			Relies on the do_list_product() when /xxx ir *zzz must be resolved.
+			WHEN do_list_product() only returns one row THEN it also shows the product details :-) """
+
+		# Did the user provides a /supplier_ref or *label_to_search ?
+		if( params[0][0] in ( '*','/' ) ):
+			# List & display articles matching the request
+			psr_lst = self.do_list_product( params )
+			# If only 1 items -> resolve id_product and list detail about it
+			if len( psr_lst )== 1:
+				self.output.writeln( ' ' )
+				_id = psr_lst[0].product_data.id
+			else:
+				# too much product returned ! so abort
+				return
+		else:
+			_id = int( params[0] ) # use the id provided on the command line
+
 		p = self.cachedphelper.products.product_from_id( _id )
 		if not( p ):
 			self.output.writeln( 'No product ID %s' % _id )

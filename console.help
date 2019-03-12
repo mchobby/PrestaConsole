@@ -24,6 +24,8 @@ Key-in only a <WORD> or /<WORD> or *<WORD> would be translated into the command 
 If the <WORD> only contains digits then the command is translated to "print product <WORD>" and print the product label.
 
 Key-in a .<ID> would ne translate to the command "show product <ID>"
+Key-in a ./<Supplier_ref> would try to resolve the supplier ref before "show product <ID>"
+Key-in a .*<label_text> would try to resolve the text before "show product <ID>"
 
 It also exist bag manipulation commands
 	* add/remove IDs       with +3*125 or -4*1024
@@ -225,7 +227,10 @@ set debug <VALUE> :
 
   toggle the debug flag (1/0).
 
+upgrade :
 
+  Collect the last version of the source code from the GitHub.
+	Don't forget to restart :-)
 
 CONSOLE OPTIONS :
 =================
