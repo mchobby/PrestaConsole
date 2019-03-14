@@ -41,6 +41,8 @@ import xml.etree.cElementTree as etree
 import tempfile
 import datetime
 from bag import ToteBag, ToteItem
+import cmd
+import sys
 
 try:
 	from Tkinter import *
@@ -156,7 +158,16 @@ class PrestaOut( object ):
 		return _r
 
 
+class CmdParse(cmd.Cmd):
+	prompt = '> '
+	#def do_listall(self, line):
+	#	print(commands)
+	def __init__( self, cmd_callback ):
+		cmd.Cmd.__init__( self )
+		self.cmd_callback = cmd_callback
 
+	def default(self, line):
+		self.cmd_callback( line )
 
 class BaseApp( object ):
 	""" Basic Applicative class """
@@ -167,18 +178,16 @@ class BaseApp( object ):
 		:params keywords: keywords and their equivalent
 		:params commands: supported commands and parameters count
 		"""
+		self.cmd_parse = CmdParse( self.cmd_parse_callback )
 		self.config = Config()
 		self.KEYWORDS = keywords
 		self.COMMANDS = commands
 		self.output = PrestaOut()
 
-
 		# initialize the logging
 		logging.basicConfig( filename=self.config.logfile, level=logging.INFO,
 							 format='%(asctime)s - [%(levelname)s] %(message)s',
 							 datefmt='%d/%m/%y %H:%M:%S.%f' )
-
-
 
 		# A CachedPrestaHelper is a PrestaHelper with cache capabilities
 		self.cachedphelper = CachedPrestaHelper( self.config.presta_api_url, self.config.presta_api_key, debug = False, progressCallback = progressHandler )
@@ -283,19 +292,34 @@ class BaseApp( object ):
 				if self.cachedphelper.debug:
 					traceback.print_exc()
 
+	#def run_deprecated( self ):
+	#	""" Run the main cmd line requests loop """
+	#	value = ''
+	#	while value != 'quit':
+	#		try:
+	#			value = raw_input( '> ' )
+	#			self.evaluate_line( value )
+	#			self.output.writeln('')
+    #
+	#		except Exception as err:
+	#			self.output.writeln( '[ERROR] %s' % err )
+	#			if self.cachedphelper.debug:
+	#				traceback.print_exc()
+
 	def run( self ):
 		""" Run the main cmd line requests loop """
-		value = ''
-		while value != 'quit':
-			try:
-				value = raw_input( '> ' )
-				self.evaluate_line( value )
-				self.output.writeln('')
+		# it is delegated to cmd.Cmd miniframwork
+		self.cmd_parse.cmdloop() # cmd.Cmd.cmdloop() --> see default()
 
-			except Exception as err:
-				self.output.writeln( '[ERROR] %s' % err )
-				if self.cachedphelper.debug:
-					traceback.print_exc()
+	def cmd_parse_callback( self, line ):
+		# Default command handler for cmd.Cmd.cmdloop()
+		try:
+			self.evaluate_line( line )
+			self.output.writeln('')
+		except Exception as err:
+			self.output.writeln( '[ERROR] %s' % err )
+			if self.cachedphelper.debug:
+				traceback.print_exc()
 
 # ===========================================================================
 #
@@ -306,6 +330,7 @@ class BaseApp( object ):
 KEYWORDS = {
 	'list'    : ['ls'],
 	'product' : ['prod','arti', 'article'],
+	'option'  : ['options'],
 	'supplier': ['sup', 'supp', 'four'],
 	'ean'     : ['ean'],
 	'label'   : ['lb'],
