@@ -169,6 +169,10 @@ class CmdParse(cmd.Cmd):
 	def default(self, line):
 		self.cmd_callback( line )
 
+	def do_help( self , line ):
+		""" Overwrite help command to redirect it to the PrestaConsole help """
+		self.cmd_callback( 'help' )
+
 class BaseApp( object ):
 	""" Basic Applicative class """
 
