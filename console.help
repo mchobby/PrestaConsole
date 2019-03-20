@@ -68,6 +68,9 @@ bag :
 
   Show the content of the bag (shopping basket)
 
+bag clear :
+
+  Clear the bag (shppoing basket)
 
 bag export :
 

@@ -121,7 +121,7 @@ class PrestaOut( object ):
 		self.filename = ''  #  filename for the file handle
 
 	def writeln( self, obj ):
-		print( obj )
+		print( obj.decode( sys.stdout.encoding ) )
 		if self.fh != None:
 			self.fh.write( obj )
 			self.fh.write(  '\n' )
@@ -596,7 +596,7 @@ class App( BaseApp ):
 			self.output.writeln( sPrint % tuple( _lst ) )
 			_count += 1
 
-		self.output.writeln( '%s items in result' % _count )
+		self.output.writeln( '%s rows in result' % _count )
 
 			#print( '%7i : %s : %5i : %s - %s' % ( \
 			#	psr.product_data.id, \
@@ -637,7 +637,10 @@ class App( BaseApp ):
 			self.output.writeln(  '(empty bag)' )
 		else:
 			self.output_product_search_result( psr_list = self.bag )
-
+			totals = self.bag.total_price_ordered() # sum, sum_ttc, sum_wholesale_price
+			self.output.writeln( 'Total (TTC) : %6.2f Eur (%6.2f TTC)' % (totals[0], totals[1]) )
+			if totals[2]>0:
+				self.output.writeln( 'Marge       : %6.2f Eur (%4.2f %%)' % (totals[0]-totals[2], ((totals[0]-totals[2])/totals[2])*100) )
 		#for idx, item in enumerate( reversed(self.bag) if _desc else self.bag ):
 		#	#if max_row and (idx>=max_row):
 		#	#	print( '> ...' ) # indicates the presence of more items in the bag
