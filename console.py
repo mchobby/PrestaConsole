@@ -474,14 +474,14 @@ class App( BaseApp ):
 		# The QM warning value
 		if psr.qty <= 0:
 			value2 = '%s' % psr.qty
-		elif _qm and (psr.qty < _qm):
+		elif _qm and (psr.qty <= _qm):
 			value2 = '!!!'
 		else:
 			value2 = ''
 
 		return (value1, value2) # QM_value, QM_Warning_Message
 
-	def get_qo_info( self, psr ):
+	def get_qo_info( self, psr, as_int = False ):
 		""" grab the 'Quantity Order' information for a given product.
 
 			:param psr: ProductSearchResult item for whom the QM Warning should be computed.
@@ -495,9 +495,9 @@ class App( BaseApp ):
 				_qo = int(_params['QO'])
 				value1 = _qo
 			except:
-				value1 = '???'
+				value1 = '???' if not(as_int) else 0
 		else:
-			value1 = '---'
+			value1 = '---' if not(as_int) else 0
 
 		return value1 # QO_value
 
@@ -821,10 +821,15 @@ class App( BaseApp ):
 			if 'order' in extra_params:
 				# Remove all items that are not initiating QM Warning
 				psr_lst.filter_out( lambda psr : self.get_qm_info(psr)[1] == '' )
+
 			sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
 			self.output_product_search_result( psr_list = sorted_lst )
-
-
+			if 'order' in extra_params:
+				# Calculate buy estimation (based on QM)
+				total = 0
+				for item in psr_lst:
+					total += item.product_data.wholesale_price * self.get_qo_info( item , as_int=True )
+				print( 'Total : %7.2f Eur HTVA' % total )
 		# Collect all extra parameter after "list supplier <PARAM>" "
 		if len( params )>1:
 			extra_params = list( [ p.lower() for p in params[1:] ] )
