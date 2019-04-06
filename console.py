@@ -121,7 +121,8 @@ class PrestaOut( object ):
 		self.filename = ''  #  filename for the file handle
 
 	def writeln( self, obj ):
-		print( obj.decode( sys.stdout.encoding ) )
+		#print( obj.decode( sys.stdout.encoding ) )
+		print( obj )
 		if self.fh != None:
 			self.fh.write( obj )
 			self.fh.write(  '\n' )
@@ -359,6 +360,7 @@ COMMANDS = [
 	('bag clear'      , 0   ),
 	('bag export'     , 0   ),
 	('bag import'     , 0   ),
+	('bag links'      , 0   ),
 	('bag'            , 0   ),
 	('check stock config',0 ),
 	('editor begin'   , 0   ),
@@ -414,7 +416,8 @@ class App( BaseApp ):
 						 'print-cpi'         : '12',
 						 'print-lpi'         : '7',
 						 'print-sides'       : 'one-sided',
-						 'editor'			 : 'pluma'
+						 'editor'			 : 'pluma',
+						 'shop_url_product'  : 'https://shop.mchobby.be/product.php?id_product={id}'
 					   }
 
 		# Init params from load data
@@ -685,6 +688,15 @@ class App( BaseApp ):
 		root.destroy()
 		# display information to user
 		self.output.writeln( 'reloaded from %s' % root.filename )
+
+	def do_bag_links( self, params ):
+		""" Export BAG as text list + Link to the webshop """
+		for item in self.bag:
+			self.output.writeln( '%s x %s' % (item.qty, item.product.reference ) )
+			self.output.writeln( '   %s' % item.product.name )
+			self.output.writeln( '   %8.2f Eur TTC/p (indicatif)' % (item.product.price*1.21) )
+			self.output.writeln( '   '+self.options['shop_url_product'].format( id=item.product.id )  )
+			self.output.writeln( ' ' )
 
 	def do_check_stock_config( self, params ):
 		""" Check all the product with improper stock configuration. """

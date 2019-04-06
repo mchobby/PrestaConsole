@@ -72,6 +72,10 @@ bag clear :
 
   Clear the bag (shppoing basket)
 
+bag links :
+
+  export the bag content as TEXT list + link to webshop
+
 bag export :
 
   Export the bag as XML file ready to import in LibreOffice calc.
