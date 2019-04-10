@@ -2,6 +2,8 @@
 # Ce fichier est censé contenir des informations sensibles
 #   comme l'access_token et des core_id
 config.ini
+console.startup
+console.sh
 cachefile.pkl
 logfile.log
 
