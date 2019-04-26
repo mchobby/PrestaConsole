@@ -65,47 +65,6 @@ def catch_ctrl_C(sig,frame):
     print "Il est hors de question d'autoriser la sortie sauvage!"
 signal.signal(signal.SIGINT, catch_ctrl_C)
 
-#PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
-#PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
-#PRINTER_ENCODING = 'cp850'
-
-
-#def list_products( cachedphelper, key ):
-#	""" Search for a product base on its partial reference code + list them """
-#	assert isinstance( key, str ), 'Key must be a string'
-#	if len( key ) < 3:
-#		print( 'searching product requires at least 3 characters' )
-#		return
-#
-#	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
-#	for item in result:
-#		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
-
-
-#def build_supplier_product_list( cachedphelper ):
-#	""" Build a list of product for that supplier (the default supplier) """
-#	r = []
-#	products = cachedphelper.get_products()
-#	for item in products:
-#		_cargo = Product_cargo( item )
-#		# Identify stock information
-#		stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
-#		if stock:
-#			_cargo.qty_stock = stock.quantity
-#		r.append( _cargo )
-#	# Also locates all the IT-xxx articles.
-#	# They are NOT ACTIVE so we would not duplicate them
-#	for item in products.inactivelist:
-#		if item.reference.find( 'IT-' ) == 0:
-#			_cargo = Product_cargo( item )
-#			# Identify stock information
-#			stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
-#			if stock:
-#				_cargo.qty_stock = stock.quantity
-#			r.append( _cargo )
-#	return r
-
-
 
 def progressHandler( prestaProgressEvent ):
 	if prestaProgressEvent.is_finished:
@@ -297,20 +256,6 @@ class BaseApp( object ):
 				if self.cachedphelper.debug:
 					traceback.print_exc()
 
-	#def run_deprecated( self ):
-	#	""" Run the main cmd line requests loop """
-	#	value = ''
-	#	while value != 'quit':
-	#		try:
-	#			value = raw_input( '> ' )
-	#			self.evaluate_line( value )
-	#			self.output.writeln('')
-    #
-	#		except Exception as err:
-	#			self.output.writeln( '[ERROR] %s' % err )
-	#			if self.cachedphelper.debug:
-	#				traceback.print_exc()
-
 	def run( self ):
 		""" Run the main cmd line requests loop """
 		# it is delegated to cmd.Cmd miniframwork
@@ -334,6 +279,7 @@ class BaseApp( object ):
 
 KEYWORDS = {
 	'list'    : ['ls'],
+	'links'    : ['link'],
 	'product' : ['prod','arti', 'article'],
 	'option'  : ['options'],
 	'supplier': ['sup', 'supp', 'four'],
@@ -354,8 +300,6 @@ KEYWORDS = {
 #    Needed Parameter '+': 1 or more, '*': 0 or mode, numeric (exactly X values)
 COMMANDS = [
 	('ean'            , 1   ),
-	('help keyword'   , 1   ),
-	('help command'   , 0   ),
 	('help'           , 0   ),
 	('bag clear'      , 0   ),
 	('bag export'     , 0   ),
@@ -373,7 +317,8 @@ COMMANDS = [
 	('label king'     , 0   ),
 	('label war'      , 0   ),
 	('label vat'      , 0   ),
-    ('list product'   , '+' ),
+	('links'          , 1   ),
+	('list product'   , '+' ),
 	('list supplier'  , '*' ),
 	('print once'     , 0   ),
 	('print begin'    , 0   ),
@@ -386,6 +331,8 @@ COMMANDS = [
 	('save'           , 0   ),
 	('set debug'      , 1   ),
 	('set'            , 2   ),
+	('show keyword'   , 1   ),
+	('show command'   , 0   ),
 	('show debug'     , 0   ),
 	('show option'    , '*' ),
 	('show product'   , 1   ),
@@ -750,18 +697,6 @@ class App( BaseApp ):
 		""" Display Help """
 		os.system( 'less console.help' )
 
-	def do_help_keyword( self, params ):
-		""" Display keyword equivalents for params """
-		kw = params[0].lower()
-		if not kw in self.KEYWORDS:
-			raise ValueError( '%s is not a valid keyword!' % kw )
-		self.output.writeln( '"%s" equivalence are %s' % (kw, ', '.join( self.KEYWORDS[kw])) )
-
-	def do_help_command( self, params ):
-		""" Display list of commands """
-		for cmd, param_count in self.COMMANDS:
-			self.output.writeln( "%s %s" % (cmd, "<%s>" % param_count if param_count!=0 else "" ) )
-
 	def do_label_small( self, params ):
 		handle_print_custom_label_small()
 
@@ -784,6 +719,21 @@ class App( BaseApp ):
 
 	def do_label_vat( self, params ):
 		handle_print_vat_label_large()
+
+	def do_links( self, params ):
+		""" Export PRODUCT as text list + Link to the webshop """
+		_id = int( params[0] ) # use the id provided on the command line
+
+		p = self.cachedphelper.products.product_from_id( _id )
+		if not( p ):
+			self.output.writeln( 'No product ID %s' % _id )
+			return
+
+		self.output.writeln( '%s x %s' % (1, p.reference ) )
+		self.output.writeln( '   %s' % p.name )
+		self.output.writeln( '   %8.2f Eur TTC/p (indicatif)' % (p.price*1.21) )
+		self.output.writeln( '   '+self.options['shop_url_product'].format( id=p.id )  )
+		self.output.writeln( ' ' )
 
 	def do_list_product( self, params ):
 		""" Search for a product base on its partial reference code + list themself.
@@ -929,6 +879,18 @@ class App( BaseApp ):
 		""" Save the memory data to the cache file """
 		self.output.writeln( 'Saving cache...' )
 		self.cachedphelper.save_cache_file()
+
+	def do_show_keyword( self, params ):
+		""" Display keyword equivalents for params """
+		kw = params[0].lower()
+		if not kw in self.KEYWORDS:
+			raise ValueError( '%s is not a valid keyword!' % kw )
+		self.output.writeln( '"%s" equivalence are %s' % (kw, ', '.join( self.KEYWORDS[kw])) )
+
+	def do_show_command( self, params ):
+		""" Display list of commands """
+		for cmd, param_count in self.COMMANDS:
+			self.output.writeln( "%s %s" % (cmd, "<%s>" % param_count if param_count!=0 else "" ) )
 
 	def do_show_debug( self, params ):
 		""" Show lot of information for inner debugging """

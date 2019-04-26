@@ -36,6 +36,7 @@ Quick help :
 ------------
 * The command "help" shows the help file.
 * The command "show command" show the list of supported command.
+* The command "show keywords <PARAM>" show the equivalent keywords <PARAM>
 * The command "show debug" show many information about internal state.
 
 Startup file :
@@ -51,12 +52,12 @@ help :
 
   show this help file
 
-help keyword <PARAM> :
+show keyword <PARAM> :
 
   show all equivalent keywords of PARAM.
-  Eg: help keyword list
+  Eg: show keyword list, show keyword supplier
 
-help command :
+show command :
 
   show a list of all supported commands.
 
@@ -142,6 +143,11 @@ label war :
 
     Print warranty labels with prefix code + increasing numbers.
 
+
+link <PARAM>
+
+  Show the product <PARAM> as text + link to the webshop.
+	<PARAM> is the product ID to look for.
 
 list product <PARAM> :
 
