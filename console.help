@@ -39,6 +39,20 @@ Quick help :
 * The command "show keywords <PARAM>" show the equivalent keywords <PARAM>
 * The command "show debug" show many information about internal state.
 
+Piped commands :
+----------------
+When a pipe (|) is present in a command, everything before the command is executed
+by the console interpreter (writen to a temp file) then to the operating system
+interpreter with the structure
+
+  cat result_of_command_in_temp_file | remain_of_piped_command.
+
+that allows to write commands like:
+
+  list supplier hardk | grep C2
+	list product * | grep as_int
+	mearm | grep -i microbit
+
 Startup file :
 --------------
 When present, the "console.startup" is loaded from the local directory.
@@ -103,9 +117,16 @@ editor begin :
 editor end   :
 editor abort :
 
-  Work all the same as "print once", "print begin", ... but opens and editor with
+  Work all the same as "print once", "print begin", ... but opens an editor with
   the text instead of printing the result.
   Note: the editor to stars is mentionned in the "editor" option.
+
+file begin  :
+file end    :
+file abort  :
+
+  Work all the same as "print begin", .... but store the content into the created
+	temporary file. This process is used internally with PIPED commands.
 
 label product <ID> :
 
@@ -153,6 +174,7 @@ list product <PARAM> :
 
   Show the list of product corresponding to <PARAM>.
   <PARAM> may have multiple possible values:
+	* *      - List all the produts available in the system
   * <TEXT> - List the product with reference containing the TEXT
   * /<REF> - List the product with SUPPLIER reference containng the REF
 

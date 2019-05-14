@@ -77,11 +77,15 @@ class PrestaOut( object ):
 
 	def __init__( self ):
 		self.fh = None # File handle
-		self.filename = ''  #  filename for the file handle
+		self.filename = ''  #  filename for the file operation handling
+		self.stdout_active = True # writeln display string on the terminal
 
 	def writeln( self, obj ):
 		#print( obj.decode( sys.stdout.encoding ) )
-		print( obj )
+		# Write to std_out
+		if self.stdout_active:
+			print( obj )
+		# Write to file
 		if self.fh != None:
 			self.fh.write( obj )
 			self.fh.write(  '\n' )
@@ -117,6 +121,8 @@ class PrestaOut( object ):
 		self.filename = None
 		return _r
 
+# No command to execute
+NOPE = -1
 
 class CmdParse(cmd.Cmd):
 	prompt = '> '
@@ -173,8 +179,31 @@ class BaseApp( object ):
 	def _decode_command( self, sCmd ):
 		""" Extract the command and parameters from the command string. """
 		if len( sCmd.strip() )==0:
-			return( None, [] )
+			return( None, [] ) # Unable to decode
 
+		# Handle a PIPED command
+		if ( '|' in sCmd ):
+			sConsoleCmd = sCmd[:sCmd.index('|')]
+			sPipeCmd    = sCmd[sCmd.index('|'):]
+			old_stdout_active = self.output.stdout_active
+
+			if not self.cachedphelper.debug :
+				self.output.stdout_active = False
+			try:
+				self.do_file_begin( params=None )
+				self.evaluate_line( sConsoleCmd )
+				sFilename = self.do_file_end( params=None )
+				sPipeCmd = 'cat %s %s' % (sFilename, sPipeCmd)
+				# Should display the result directly on terminal whatever is the
+				# internal self.output.stdout_active flag state
+				os.system( sPipeCmd )
+			finally:
+				self.output.stdout_active = old_stdout_active
+
+			# Now returns Nothing to execute (everything is already done)
+			return ( NOPE, [] )
+
+		# Handle the "Console command"
 		keywords = sCmd.split() # fait déjà un strip des paramètres
 		_r = []
 		for word in keywords:
@@ -184,7 +213,7 @@ class BaseApp( object ):
 		params = _r # apply the new parameter
 
 		# Treat really special case
-		#   Backward compatibility
+		#   Backward compatibility : ID -> label product, .xxx -> Show product, xxx -> list product
 		if (len( params ) == 1) and not( params[0] in self.KEYWORDS ) and \
 		    not( any([item for item in self.COMMANDS if item[0]==params[0]]) ): # Note: somes command makes only one word (and are not keyword)
 			# we are looking for product OR having a product ID
@@ -215,7 +244,7 @@ class BaseApp( object ):
 					pass
 				elif param_count == '+':
 					if len(r_params)<1:
-						raise Exeption( 'At least one parameter required for "%s"' % r_cmd )
+						raise Exception( 'At least one parameter required for "%s"' % r_cmd )
 				elif param_count == None:
 					pass
 				elif type(param_count) is int:
@@ -231,6 +260,8 @@ class BaseApp( object ):
 		:param value: the command line (string) to evaluate
 		"""
 		cmd, params = self._decode_command( value )
+		if cmd == NOPE:
+			return
 		if cmd == None:
 			print( 'unknow command "%s"' % value )
 			return
@@ -311,6 +342,9 @@ COMMANDS = [
 	('editor end'     , 0   ),
 	('editor once'    , 0   ),
 	('editor abort'   , 0   ),
+	('file begin'     , 0   ),
+	('file end'       , 0   ),
+	('file abort'     , 0   ),
 	('label product'  , 1   ),
 	('label small'    , 0   ),
 	('label large'    , 0   ),
@@ -693,6 +727,18 @@ class App( BaseApp ):
 		self.output.close_temp_file()
 		raise Exception( 'Editor file aborted!' )
 
+	def do_file_begin( self, params ):
+		self.output.writeln( 'file %s created' % self.output.open_temp_file() )
+
+	def do_file_end( self, params ):
+		filename = self.output.close_temp_file()
+		self.output.writeln( 'Closing %s ...' % filename )
+		return filename
+
+	def do_file_abort( self, params ):
+		self.output.close_temp_file()
+		raise Exception( 'File aborted!' )
+
 	def do_help( self, params ):
 		""" Display Help """
 		os.system( 'less console.help' )
@@ -741,12 +787,14 @@ class App( BaseApp ):
 		:return: ProductSearchResultList computed and displayed by the function. """
 		assert len(params)>0 and isinstance( params[0], str ), 'the parameter must be a string'
 		key = params[0]
-		if len( key ) < 3:
+		if key=='*': # List all products
+			key = ''
+		elif len( key ) < 3:
 			raise ValueError( 'searching product requires at least 3 characters' )
 
-		if key[0] == '/':  # search on Supplier Ref
+		if (len(key)>0) and (key[0] == '/'):  # search on Supplier Ref
 			result = self.cachedphelper.search_products_from_supplier_ref( key[1:], include_inactives = True ) # Skip the /
-		elif key[0] == '*': # search on label
+		elif (len(key)>0) and (key[0] == '*'): # search on label
 			result = self.cachedphelper.search_products_from_label( key[1:], include_inactives = True ) # Skip the *
 		else:
 			result = self.cachedphelper.search_products_from_partialref( key, include_inactives = True )
@@ -791,7 +839,7 @@ class App( BaseApp ):
 				total = 0
 				for item in psr_lst:
 					total += item.product_data.wholesale_price * self.get_qo_info( item , as_int=True )
-				print( 'Total : %7.2f Eur HTVA' % total )
+				self.output.writeln( 'Total : %7.2f Eur HTVA' % total )
 		# Collect all extra parameter after "list supplier <PARAM>" "
 		if len( params )>1:
 			extra_params = list( [ p.lower() for p in params[1:] ] )
