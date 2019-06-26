@@ -319,14 +319,20 @@ class PrestaHelper(object):
 		count  - (default=1) the number of orders to retreive fromId (counting down)
 
 		Returns:
-		A list of OrderData objects
+		A list of OrderData objects or PrestaShopWebServiceError exception in case of empty content
 		"""
 		_result = []
-		for i in range( count ): #  range(1)=0 range(2)=0,1
-			el = self.__prestashop.get( 'orders', fromId-i )
-			order = OrderData( self )
-			order.load_from_xml( el )
-			_result.append( order )
+		try:
+			for i in range( count ): #  range(1)=0 range(2)=0,1
+				el = self.__prestashop.get( 'orders', fromId-i )
+				order = OrderData( self )
+				order.load_from_xml( el )
+				_result.append( order )
+		except PrestaShopWebServiceError as e:
+			if 'response is empty' in str(e): # Order ID is certainly out of range
+				pass # ignore error and return empty list
+			else:
+				raise
 		return _result
 
 	def get_order_data( self, id ):
@@ -869,18 +875,44 @@ class LanguageList( BaseDataList ):
 			return ''
 		return _language_data.name
 
+class OrderRowData( BaseData ):
+	""" Details of rows in the order.
+
+		Remarks: this class is instanciated by OrderData.load_from_xml() """
+	__slots__ = ["id", "id_product", "ordered_qty", "reference", "unit_price_ttc", "unit_price", "ean13" ]
+
+	def load_from_items( self, dic ):
+		# dic is a dictionnary with key=value pairs
+		def _extract( dic, key ):
+			if key in dic:
+				value = dic[key]
+				return value
+			return None
+
+		self.id = _extract(dic,"id")
+		self.id_product = _extract(dic,"product_id")
+		self.ordered_qty = int( _extract(dic,"product_quantity") )
+		self.reference   = _extract(dic,"product_reference")
+		self.unit_price_ttc = float( _extract(dic,"unit_price_tax_incl") ) # TTC
+		self.unit_price     = float( _extract(dic,"unit_price_tax_excl") ) # HTVA
+		self.ean13			= _extract(dic,"product_ean13")
+
+	def __repr__( self ):
+		return "%4s x %-30s (%5s) @ %7.2f htva/p" % ( self.ordered_qty, self.reference, self.id_product, self.unit_price )
+
 class OrderData( BaseData ):
-	""" Constains the data of an order.
+	""" Contains the data of an order.
 
 	This class is supposed to extend with time """
 
-	__slots__ = ["id", "id_customer", "id_carrier", "current_state", "valid", "payment", "total_paid_tax_excl", "total_paid" ]
+	__slots__ = ["id", "id_customer", "id_carrier", "current_state", "valid", "payment", "total_paid_tax_excl", "total_paid", "shipping_number", "id_shop", "id_lang", "rows"]
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an Order """
 		# print( ElementTree.tostring( node ) )
 		items = etree_to_dict( node )
 		order = items['prestashop']['order']
+
 		# print( order )
 		self.id            = int( order['id'] )
 		self.id_customer   = int( order['id_customer']['#text'] )
@@ -890,6 +922,21 @@ class OrderData( BaseData ):
 		self.payment       = order['payment']
 		self.total_paid_tax_excl = float( order['total_paid_tax_excl' ] )
 		self.total_paid          = float( order['total_paid' ] )
+		if isinstance( order['shipping_number'], dict ) and ('#text' in order['shipping_number']) :
+			self.shipping_number = order['shipping_number']['#text']
+		else:
+			self.shipping_number = ''
+		self.id_shop			 = int( order['id_shop'] )
+		self.id_lang			 = int( order['id_lang']['#text'] )
+		self.rows				 = []
+		_rows = order['associations']['order_rows']['order_row']
+		if isinstance( _rows, dict ): # @ PrestaShop they drop the list of rows if there is only one row in the order!!!
+			_rows = [ _rows ]
+		for items in _rows : # For each row (entry in the list) --> Load row details
+			# Items is a list of node values
+			_row = OrderRowData( self.helper )
+			_row.load_from_items( items )
+			self.rows.append( _row )
 
 class CustomerMessageData( BaseData ):
 	""" Contains the data of a customer messsgae """

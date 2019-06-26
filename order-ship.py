@@ -5,7 +5,7 @@
 from prestaapi import PrestaHelper, CachedPrestaHelper, OrderStateList
 from config import Config
 from pprint import pprint
-import logging 
+import logging
 import sys
 import signal
 # debugging
@@ -20,14 +20,16 @@ cmd_nr = raw_input( '#Commande: ' )
 if not cmd_nr.isdigit():
    raise ValueError( '%s is not a number' % cmd_nr )
 
+
 orders = h.get_last_orders( int(cmd_nr), 1 )
-order = orders[0]
-if len( orders ) < 0:
+if len( orders ) <= 0:
     raise ValueError( 'order %s not found' % cmd_nr )
 
+order = orders[0]
 customer = h.get_customer( order.id_customer )
 
 print( '--- Order ID : %i ---' % order.id )
+print( 'Shop ID      : %s' % order.id_shop )
 # print( 'Carrier   ID : %i' % order.id_carrier )
 # print( 'current state: %i' % order.current_state )
 # print( 'Customer  ID : %i' % order.id_customer )
@@ -39,12 +41,11 @@ print( 'valid        : %i' % order.valid )
 print( 'payment      : %s' % order.payment )
 print( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
 print( 'total Paid   : %.2f' % order.total_paid )
+print( 'Shipping Nr  : %s'   % order.shipping_number )
+# Content the order
+for row in order.rows:
+	print( row )
 
-# Extract the xml data
-el_prestashop = h.get_order_data( int(cmd_nr) )
-if el_prestashop == None:
-    print( 'This order does not exists' )
-    exit()
 
 # Update the order current_status
 """order = list( el_prestashop )[0]
@@ -55,12 +56,13 @@ order_current_state[0].text = str( OrderStateList.ORDER_STATE_SHIPPING )
 """
 
 """ Activate error detection
-      http://stackoverflow.com/questions/14457470/prestapyt-error-on-edit 
+      http://stackoverflow.com/questions/14457470/prestapyt-error-on-edit
     A sample of XML to send
-      http://nullege.com/codes/show/src%40p%40r%40prestapyt-HEAD%40examples%40prestapyt_xml.py/22/prestapyt.PrestaShopWebService.edit/python 
+      http://nullege.com/codes/show/src%40p%40r%40prestapyt-HEAD%40examples%40prestapyt_xml.py/22/prestapyt.PrestaShopWebService.edit/python
 """
 # Save the order
-h.post_order_data( int(cmd_nr), el_prestashop )
+print( 'post_order_data() call deactivated' )
+#h.post_order_data( int(cmd_nr), el_prestashop )
 
 #print( order_properties[0].tag )
 #print( order_properties[0].text )
