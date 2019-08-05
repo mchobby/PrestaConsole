@@ -905,16 +905,18 @@ class OrderData( BaseData ):
 
 	This class is supposed to extend with time """
 
-	__slots__ = ["id", "id_customer", "id_carrier", "current_state", "valid", "payment", "total_paid_tax_excl", "total_paid", "shipping_number", "id_shop", "id_lang", "rows"]
+	__slots__ = ["id", "id_customer", "id_carrier", "current_state", "valid", "payment", "total_paid_tax_excl", "total_paid", "shipping_number", "id_shop", "id_lang", "date_add", "date_upd", "rows"]
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an Order """
-		# print( ElementTree.tostring( node ) )
+		#print( ElementTree.tostring( node ) )
 		items = etree_to_dict( node )
 		order = items['prestashop']['order']
 
 		# print( order )
 		self.id            = int( order['id'] )
+		self.date_add      = order['date_add'] # Date when the order was placed
+		self.date_upd      = order['date_upd'] # Date when the order was last updated
 		self.id_customer   = int( order['id_customer']['#text'] )
 		self.id_carrier    = int( order['id_carrier']['#text'] )
 		self.current_state = int( order['current_state']['#text'] )
