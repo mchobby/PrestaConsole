@@ -352,8 +352,10 @@ COMMANDS = [
 	('label war'      , 0   ),
 	('label vat'      , 0   ),
 	('links'          , 1   ),
+	('list order'     , '*' ),
 	('list product'   , '+' ),
 	('list supplier'  , '*' ),
+	('order'          , 1   ),
 	('print once'     , 0   ),
 	('print begin'    , 0   ),
 	('print end'      , 0   ),
@@ -696,6 +698,37 @@ class App( BaseApp ):
 		self.output.writeln( 'Products with improper stock configuration' )
 		self.output_product_search_result( psr_list = sorted_lst )
 
+	def do_order( self, params ):
+		""" Load and Show the detail of a given order """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID cmd'
+		_id = int( params[0] )
+
+		orders = self.cachedphelper.get_last_orders( _id, 1 )
+		if len( orders ) <= 0:
+			raise ValueError( 'order %s not found' % _id )
+
+		order = orders[0]
+		customer = self.cachedphelper.get_customer( order.id_customer )
+
+		self.output.writeln( '--- Order ID : %i ---' % order.id )
+		self.output.writeln( 'Shop ID      : %s' % order.id_shop )
+		# print( 'Carrier   ID : %i' % order.id_carrier )
+		# print( 'current state: %i' % order.current_state )
+		# print( 'Customer  ID : %i' % order.id_customer )
+		self.output.writeln( 'Customer     : %s' % customer.customer_name )
+		self.output.writeln( 'Cust.EMail   : %s' % customer.email )
+		self.output.writeln( 'Carrier      : %s' % self.cachedphelper.carriers.carrier_from_id( order.id_carrier ).name )
+		self.output.writeln( 'Order Date   : %s' % order.date_add )
+		self.output.writeln( 'Current State: %s @ %s' % ( self.cachedphelper.order_states.order_state_from_id( order.current_state ).name, order.date_upd) )
+		self.output.writeln( 'valid        : %i' % order.valid )
+		self.output.writeln( 'payment      : %s' % order.payment )
+		self.output.writeln( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
+		self.output.writeln( 'total Paid   : %.2f' % order.total_paid )
+		self.output.writeln( 'Shipping Nr  : %s'   % order.shipping_number )
+		self.output.writeln( '' )
+		# Content the order
+		for row in order.rows:
+			self.output.writeln( row )
 
 	def do_ean( self, params ):
 		""" Generates the EAN13 for the ID_Product """
@@ -780,6 +813,28 @@ class App( BaseApp ):
 		self.output.writeln( '   %8.2f Eur TTC/p (indicatif)' % (p.price*1.21) )
 		self.output.writeln( '   '+self.options['shop_url_product'].format( id=p.id )  )
 		self.output.writeln( ' ' )
+
+	def do_list_order( self, params ):
+		""" Search for the last order on the shop """
+		if len(params)>0:
+			_count = int( params[0] ) # use the id provided on the command line
+			if _count > 50:
+				raise ValueError( 'Count %i is too high! (50 max)' % _count )
+		else:
+			_count = 10
+
+		last_id = self.cachedphelper.get_lastorder_id()
+		orders = self.cachedphelper.get_last_orders( last_id, _count )
+		self.output.writeln( "%7s | %-5s | %-19s | %10s | %-20s | %-30s | %-20s " % ('id','valid','date','Tot.htva','Customer', 'Carrier', 'Statut') )
+		self.output.writeln( "-"*129 )
+		for order in orders:
+			customer = self.cachedphelper.get_customer( order.id_customer )
+			carrier_name = self.cachedphelper.carriers.carrier_from_id( order.id_carrier ).name
+			status_name  = self.cachedphelper.order_states.order_state_from_id( order.current_state ).name
+			self.output.writeln( '%7i | %-5s | %19s | %10.2f | %-20s | %-30s | %-20s ' % \
+				( order.id, order.valid, order.date_add, order.total_paid_tax_excl, \
+				  customer.customer_name[:20], carrier_name[:30], status_name[:20] ) \
+				)
 
 	def do_list_product( self, params ):
 		""" Search for a product base on its partial reference code + list themself.

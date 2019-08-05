@@ -170,6 +170,9 @@ link <PARAM>
   Show the product <PARAM> as text + link to the webshop.
 	<PARAM> is the product ID to look for.
 
+list order :
+  Show the list of recent order received on the WebShop
+
 list product <PARAM> :
 
   Show the list of product corresponding to <PARAM>.
@@ -190,6 +193,13 @@ list supplier <PARAM> order :
   When "order" is mentionned, the list is reduced to items having a
   value mentionned in the QM Warning (/!\) column. The QM Warning
   column can be displayed with the option "show-product-qm".
+
+
+order <ID> :
+
+  Show the details of a given order (who, when, what, status, etc).
+  A list of recent order can be retreived with "list order"
+
 
 print once :
 
