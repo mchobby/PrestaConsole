@@ -52,7 +52,7 @@ except Exception as err:
 
 
 from labelprn import handle_print_for_product, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
-		handle_print_warranty_label_large, handle_print_vat_label_large
+		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large
 # from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
 #RE_COMMAND                = "^\+([a-zA-Z])$"       # (command) +r OU +s
@@ -331,6 +331,7 @@ KEYWORDS = {
 #    Needed Parameter '+': 1 or more, '*': 0 or mode, numeric (exactly X values)
 COMMANDS = [
 	('ean'            , 1   ),
+	('calc ean'       , 1   ),
 	('help'           , 0   ),
 	('bag clear'      , 0   ),
 	('bag export'     , 0   ),
@@ -351,6 +352,7 @@ COMMANDS = [
 	('label king'     , 0   ),
 	('label war'      , 0   ),
 	('label vat'      , 0   ),
+	('label ean'      , 0   ),
 	('links'          , 1   ),
 	('list order'     , '*' ),
 	('list product'   , '+' ),
@@ -739,6 +741,13 @@ class App( BaseApp ):
 		product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 		self.output.writeln( '%s' % product_ean )
 
+	def do_calc_ean( self, params ):
+		""" Caclulate the check digit of EAN (on 12 positions) """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit() and len(params[0])==12, 'the parameter must be the first 12 ean digits'
+
+		_ean = calculate_ean13( params[0] ) # Add the checksum to 12 positions
+		self.output.writeln( '%s' % _ean )
+
 	def do_editor_begin( self, params ):
 		self.output.writeln( 'editor file %s created' % self.output.open_temp_file() )
 
@@ -798,6 +807,9 @@ class App( BaseApp ):
 
 	def do_label_vat( self, params ):
 		handle_print_vat_label_large()
+
+	def do_label_ean( self, params ):
+		handle_print_ean_label_large()
 
 	def do_links( self, params ):
 		""" Export PRODUCT as text list + Link to the webshop """

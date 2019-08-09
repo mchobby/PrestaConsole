@@ -112,6 +112,10 @@ ean <ID> :
 
   Calculate the product EAN13 of <ID> and display it on the console
 
+calc ean <12digits>
+
+  Calculate the check digit of the 12 first digits of an ean
+
 editor once  :
 editor begin :
 editor end   :
@@ -154,6 +158,10 @@ label king :
    Can also print a second line with KING SIZE font.
    Interactive command would allow to choose the number of labels.
 
+label ean :
+
+  Print a custom label with EAN code.
+  Interactive command would allow to choose the title, Text and EAN code.
 
 label vat :
 
