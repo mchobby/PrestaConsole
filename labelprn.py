@@ -412,7 +412,9 @@ def print_label_large( title, label, ean, qty=1 ):
 	# Write a BarCode field
 	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode(title) ) # use font E as default
 
-	d.ean13( origin=(500,62), ean=unicode(ean), height_dots = 50 )
+	#d.ean13( origin=(500,62), ean=unicode(ean), height_dots = 50 )
+	d.ean13( origin=(300,62), ean=unicode(ean), height_dots = 100 )
+
 	#d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
 
 	d.field( origin=(225,150), font=d.font('C'), data=unicode( label ) )
