@@ -417,7 +417,7 @@ def print_label_large( title, label, ean, qty=1 ):
 
 	#d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
 
-	d.field( origin=(225,150), font=d.font('C'), data=unicode( label ) )
+	d.field( origin=(225,175), font=d.font('C'), data=unicode( label ) )
 
 	# End Print format
 	d.format_end()
