@@ -28,6 +28,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList
+from output import PrestaOut
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
 from pprint import pprint
@@ -72,54 +73,7 @@ def progressHandler( prestaProgressEvent ):
 	else:
 		print( '%i/%i - %s' % ( prestaProgressEvent.current_step, prestaProgressEvent.max_step, prestaProgressEvent.msg ) )
 
-class PrestaOut( object ):
-	""" Class to manage the ouput of data to various streams """
 
-	def __init__( self ):
-		self.fh = None # File handle
-		self.filename = ''  #  filename for the file operation handling
-		self.stdout_active = True # writeln display string on the terminal
-
-	def writeln( self, obj ):
-		#print( obj.decode( sys.stdout.encoding ) )
-		# Write to std_out
-		if self.stdout_active:
-			print( obj )
-		# Write to file
-		if self.fh != None:
-			self.fh.write( obj )
-			self.fh.write(  '\n' )
-
-	def write_lines( self, lines ):
-		""" just write all the lines contained in the list """
-		for l in lines:
-			self.writeln( l )
-
-	def open_temp_file( self ):
-		""" Open temportary file to write output content.
-		    Later, this file will be used to content to the printer :-)
-
-			:returns: the openned temporary filename
-		"""
-		if self.fh:
-			return self.filename
-
-		# Create a new temporary file
-		self.filename = tempfile.mktemp( '-console-print.txt' )
-		self.fh = open( self.filename, 'w' )
-		return self.filename
-
-	def close_temp_file( self ):
-		""" just close the temporary file.
-
-			:returns: the just closed temporary filename. """
-		if not self.fh:
-			raise Exception( 'No printer file open!' )
-		_r = self.filename
-		self.fh.close()
-		self.fh = None
-		self.filename = None
-		return _r
 
 # No command to execute
 NOPE = -1
