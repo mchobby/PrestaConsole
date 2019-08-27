@@ -52,8 +52,8 @@ except Exception as err:
 	print( '[ERROR] Unable to load TKinter dependencies! %s' % err )
 
 
-from labelprn import handle_print_for_product, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
-		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large
+from labelprn import handle_print_for_product, print_custom_label_small, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
+		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large, ean12_to_ean13
 # from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
 #RE_COMMAND                = "^\+([a-zA-Z])$"       # (command) +r OU +s
@@ -307,6 +307,7 @@ COMMANDS = [
 	('label war'      , 0   ),
 	('label vat'      , 0   ),
 	('label ean'      , 0   ),
+	('label order'    , 1   ),
 	('links'          , 1   ),
 	('list order'     , '*' ),
 	('list product'   , '+' ),
@@ -755,6 +756,12 @@ class App( BaseApp ):
 		_product = self.cachedphelper.products.product_from_id( _id )
 		handle_print_for_product( _product, self.get_product_params( _id ), separator=self.options['label-separator']=='1' )
 
+	def do_label_order( self, params ):
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID order'
+
+		_id = int( params[0] )
+		# Ean12 will be automagically transformed to ean13
+		print_custom_label_small( label_title="ORDER %s" % _id, label_lines=[], qty=1, ean=("324%09d" % (_id,)) )
 
 	def do_label_war( self, params ):
 		handle_print_warranty_label_large()

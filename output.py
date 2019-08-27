@@ -32,13 +32,17 @@ class PrestaOut( object ):
 		self.fh = None # File handle
 		self.filename = ''  #  filename for the file operation handling
 		self.stdout_active = True # writeln display string on the terminal
+		self.carbon_copy = None # used to keep a copy of the writeln() calls
 
 	def writeln( self, obj ):
 		#print( obj.decode( sys.stdout.encoding ) )
 		# Write to std_out
 		if self.stdout_active:
 			print( obj )
-		# Write to file
+		# Keep a carbon copy of the test ?
+		if self.carbon_copy != None:
+			self.carbon_copy.append( obj )
+		# Write to file ?
 		if self.fh != None:
 			self.fh.write( obj )
 			self.fh.write(  '\n' )
@@ -73,3 +77,22 @@ class PrestaOut( object ):
 		self.fh = None
 		self.filename = None
 		return _r
+
+	def set_carbon_copy( self, activate=True ):
+		""" Activate or deactive the carbon_copy """
+		if activate:
+			self.carbon_copy = []
+		else:
+			self.carbon_copy = None
+
+	def reset_carbon_copy( self ):
+		""" reinitialize the carbon_copy """
+		self.carbon_copy = []
+
+	def save_carbon_copy( self, filename ):
+		""" Save the carbon copy to a text file """
+		if self.carbon_copy:
+			with open( filename, "w+") as f:
+				for line in self.carbon_copy:
+					f.write( line )
+					f.write( '\r\n' )

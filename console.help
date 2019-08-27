@@ -111,10 +111,14 @@ check stock config :
 ean <ID> :
 
   Calculate the product EAN13 of <ID> and display it on the console
+	ean 127 --> 3232100001275
+
 
 calc ean <12digits>
 
-  Calculate the check digit of the 12 first digits of an ean
+  Calculate the check digit (13th digit) of the 12 first digits of an ean.
+	Display the EAN13 as result
+  calc ean 444719000012 --> 4447190000124
 
 editor once  :
 editor begin :
@@ -161,7 +165,12 @@ label king :
 label ean :
 
   Print a custom label with EAN code.
-  Interactive command would allow to choose the title, Text and EAN code.
+  Interactive command would allow to choose the title, Text and EAN13 code.
+
+label order <ID> :
+
+  Print a label with order-id EAN barcode
+	<ID> must be the #order
 
 label vat :
 

@@ -555,11 +555,13 @@ def print_custom_label_king( label_title, label_title2, qty=1 ):
 
 	del( medium )
 
-def print_custom_label_small( label_title, label_lines, qty ):
+
+def print_custom_label_small( label_title, label_lines, qty, ean=None ):
 	""" Print the Labels on the LP2824 on small labels
 
 	label_title: title on the label, lines 1 & two in extra bold
-	label_lines: list of unicode to be printed (up to 5 lines)"""
+	label_lines: list of unicode to be printed (up to 5 lines)
+	ean        : ean12 or ean13 (as string) to print. ean12 is automatically transformed to ean13! """
 	#print product_id
 	#print product_ref
 	#print product_ean
@@ -583,6 +585,12 @@ def print_custom_label_small( label_title, label_lines, qty ):
 		d.field( origin=(40, top), font=d.font('C'), data=line )
 		top = top + 25
 
+	# Write a BarCode field
+	if ean:
+		if len(ean)!=13:
+			ean = calculate_ean13(ean) # Transform ean12 to ean13 --> append check digit
+		d.ean13( origin=(120,140), ean=unicode(ean), height_dots = 50 )
+
 	# End Print format
 	d.format_end()
 
@@ -598,6 +606,7 @@ def print_custom_label_small( label_title, label_lines, qty ):
 
 
 	del( medium )
+
 
 def ean12_to_ean13():
 	""" calculate the checksum of an ean12 to create an ean13 """

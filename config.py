@@ -11,6 +11,7 @@ CONFIG_SECTION_DEBUG = 'DEBUG'
 CONFIG_SECTION_LCD = 'LCD-DISPLAY'
 CONFIG_SECTION_COMPANY = 'COMPANY'
 CONFIG_SECTION_TOTE_BAG= 'TOTE-BAG'
+CONFIG_SECTION_ORDER_SHIP = 'ORDER-SHIP'
 
 # Keynames for section PRESTA-API
 CONFIG_KEY_KEY = 'key'
@@ -32,13 +33,16 @@ CONFIG_KEY_WEB   = 'web'
 # Tote Bag
 CONFIG_KEY_EXPORT_PATH = 'export_path'
 
+# Order-Ship
+CONFIG_KEY_DATA_PATH = 'data_path'
+
 class Config(object):
 	"""read paramters from the "config.ini" configuration file"""
 	_presta_api_key = 'None'
 	_presta_api_url = 'None'
 	_logfile = 'None'
-	_lcd_device = 'None' 
-	
+	_lcd_device = 'None'
+
 	_company_name = 'None'
 	_company_address = []
 	_company_vat = ''
@@ -46,16 +50,18 @@ class Config(object):
 	_company_web = ''
 
 	_tote_bag_export_path = ''
-	
+
+	_order_ship_data_path = ''
+
 	def __init__( self ):
 		config = ConfigParser()
 		config.read( CONFIG_FILENAME )
-		
+
 		self._presta_api_key = config.get( CONFIG_SECTION_PRESTAAPI, CONFIG_KEY_KEY )
 		self._presta_api_url = config.get( CONFIG_SECTION_PRESTAAPI, CONFIG_KEY_URL )
 		self._logfile = config.get( CONFIG_SECTION_DEBUG, CONFIG_KEY_LOGFILE )
 		self._lcd_device = config.get( CONFIG_SECTION_LCD, CONFIG_KEY_DEVICE_PATH )
-		
+
 		# Read the company information (optional)
 		try:
 			self._company_name = config.get( CONFIG_SECTION_COMPANY, CONFIG_KEY_NAME )
@@ -88,19 +94,25 @@ class Config(object):
 		try:
 			self._tote_bag_export_path = config.get( CONFIG_SECTION_TOTE_BAG, CONFIG_KEY_EXPORT_PATH )
 		except:
-			pass			
+			pass
+
+		try:
+			self._order_ship_data_path = config.get( CONFIG_SECTION_ORDER_SHIP, CONFIG_KEY_DATA_PATH )
+		except:
+			pass
+
 	@property
 	def presta_api_key( self ):
-		""" Access key to the PrestaShop API - must be generated in the 
+		""" Access key to the PrestaShop API - must be generated in the
 		PrestaShop backend"""
 		return self._presta_api_key
-	
+
 	@property
 	def presta_api_url( self ):
 		""" target url to join the PrestaShop API with the Key.
 		Should be http://shop.my_domain_name.be/api"""
 		return self._presta_api_url
-		
+
 	@property
 	def logfile( self ):
 		""" short name of the log file """
@@ -110,28 +122,31 @@ class Config(object):
 	def lcd_device( self ):
 		""" device path where is attached the LCD Device """
 		return self._lcd_device
-		
-	@property 
+
+	@property
 	def company_name( self ):
 		return self._company_name
-	
+
 	@property
 	def company_address( self ):
 		return self._company_address
-	
-	@property 
+
+	@property
 	def company_vat( self ):
 		return self._company_vat
-		
+
 	@property
 	def company_phone( self ):
 		return self._company_phone
-		
-	@property 
+
+	@property
 	def company_url( self ):
 		return self._company_url
 
 	@property
 	def tote_bag_export_path(self):
-	    return self._tote_bag_export_path
-	
+		return self._tote_bag_export_path
+
+	@property
+	def order_ship_data_path( self ):
+		return self._order_ship_data_path
