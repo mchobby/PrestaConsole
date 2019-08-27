@@ -447,10 +447,11 @@ def print_warranty_label_large( prefix_text, counter_start, label_count ):
 		d.format_start()
 
 		# Write a BarCode field
-		d.field( origin=(175,11), font=d.font('T',17,8), data= unicode( 'Garantie / Warranty') ) # use font E as default
+		d.field( origin=(175,11), font=d.font('S',17,8), data= unicode( 'Garantie/Warranty') ) # use font E as default
 		d.field( origin=(175,62), font=d.font('T',17,8), data= unicode( '%s-%i' % (prefix_text, counter_start + label_counter) ) )# use font E as default
 
-		#d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
+		war_ean = "325%09d" % (counter_start + label_counter,)  #EAN12: 325<ID_warranty> 
+		d.ean13( origin=(500,11), ean=unicode(calculate_ean13(war_ean)), height_dots = 20 )
 		# d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
 
 		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, voir les conditions' )
