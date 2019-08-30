@@ -1,0 +1,22 @@
+Here is the list of various barcode used in this GitHub
+The [prefix] + [0-padding] + <ID_xxx> always makes 12 positions.
+The EAN check digit # is added to computed 12 position EAN.
+
+EAN13                     Description
+----------------------------------------------------------
+32321<id_product>#        Product barcode
+32329<id_verb>#           Used to codify VERBS
+		                          1 : cancel
+															2 : ok
+															3 : check
+															4 : finalize
+															5 : RESET (reset all)
+															6 : Append (append order)
+32328<id_carrier>#			  Identification of the carrier
+															1000 : Post
+															1001 : Mondial Relay
+															1002 : UPS
+															1003 : DHL
+															1004 : Pick-up
+324<id_order>#            Order barcode
+325<id_warranty>#         Warranty Nr Barcode
