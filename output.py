@@ -49,7 +49,7 @@ class PrestaOut( object ):
 					self.carbon_copy.append( str(obj) )
 				except:
 					pass # Unable to add... do no report error
-					
+
 		# Write to file ?
 		if self.fh != None:
 			self.fh.write( obj )
@@ -102,5 +102,11 @@ class PrestaOut( object ):
 		if self.carbon_copy:
 			with open( filename, "w+") as f:
 				for line in self.carbon_copy:
-					f.write( line )
+					try:
+						f.write( line )
+					except:
+						try:
+							f.write( str(line) )
+						except:
+							f.write( '...' )
 					f.write( '\r\n' )
