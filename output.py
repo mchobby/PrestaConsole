@@ -41,7 +41,7 @@ class PrestaOut( object ):
 			print( obj )
 		# Keep a carbon copy of the test ?
 		if self.carbon_copy != None:
-			self.carbon_copy.append( obj )
+			self.carbon_copy.append( str(obj) )
 		# Write to file ?
 		if self.fh != None:
 			self.fh.write( obj )

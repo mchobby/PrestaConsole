@@ -4,6 +4,9 @@ sudo apt-get install python-tk
 
 sudo apt-get install mpg123
 
+# sudo apt install python-pip
+# sudo apt install git
+
 pip install --user setuptools
 pip install --user httplib2
 pip install --user prestapyt
