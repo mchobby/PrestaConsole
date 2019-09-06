@@ -463,9 +463,8 @@ def print_warranty_label_large( product, prefix_text, counter_start, label_count
 		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, voir les conditions' )
 		d.field( origin=(175,145), font=d.font('C'), data=u'générales de ventes sur shop.mchobby.be' )
 
-		d.field( origin=(500,160), font=d.font('S',17,8), data=unicode(str(product.id)) )
-		d.ean13( origin=(175,160), ean=unicode(product.ean13), height_dots = 20 )
-
+		d.field( origin=(700,170), font=d.font('S',17,8), data=unicode(str(product.id)) )
+		d.ean13( origin=(175,165), ean=unicode(product.ean13), height_dots = 20 )
 
 		# End Print format
 		d.format_end()
