@@ -304,7 +304,7 @@ COMMANDS = [
 	('label small'    , 0   ),
 	('label large'    , 0   ),
 	('label king'     , 0   ),
-	('label war'      , 0   ),
+	('label war'      , 1   ),
 	('label vat'      , 0   ),
 	('label ean'      , 0   ),
 	('label order'    , 1   ),
@@ -764,7 +764,13 @@ class App( BaseApp ):
 		print_custom_label_small( label_title="ORDER %s" % _id, label_lines=[], qty=1, ean=("324%09d" % (_id,)) )
 
 	def do_label_war( self, params ):
-		handle_print_warranty_label_large()
+		_id = int( params[0] ) # use the id provided on the command line
+
+		p = self.cachedphelper.products.product_from_id( _id )
+		if not( p ):
+			self.output.writeln( 'No product ID %s' % _id )
+			return
+		handle_print_warranty_label_large( p )
 
 	def do_label_vat( self, params ):
 		handle_print_vat_label_large()

@@ -191,20 +191,26 @@ def handle_print_custom_label_small():
 
 	print_custom_label_small( title, lines, qty )
 
-def handle_print_warranty_label_large():
-	prefix_str = raw_input(    'Préfix ou +q (ex:ELI-MEGA)             : ' )
+def handle_print_warranty_label_large( product ):
+	""" Manage the printing of warranty label for a given product.
+		May ask additionnal questions on on input
+
+		:param product: the ProductData object to print
+	"""
+	print( "Warranty label                         : %s" % product.reference )
+	prefix_str = raw_input( 'Préfix ou +q (ex:ELI-MEGA)             : ' )
 	if prefix_str == '+q':
 		return
 	counter_start = raw_input( 'N° première étiquette ou +q (ex:150021): ' )
 	if counter_start == '+q':
 		return
 	counter_start = int( counter_start )
-	how_many_label= raw_input( "Combien d'étiquette ou +q             : " )
+	how_many_label= raw_input( "Combien d'étiquette ou +q              : " )
 	if how_many_label == '+q':
 		return
 	how_many_label = int( how_many_label )
 
-	print_warranty_label_large( prefix_text = prefix_str, counter_start = counter_start, label_count = how_many_label )
+	print_warranty_label_large( product = product, prefix_text = prefix_str, counter_start = counter_start, label_count = how_many_label )
 
 def handle_print_vat_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
@@ -435,7 +441,7 @@ def print_label_large( title, label, ean, qty=1 ):
 	del( medium )
 
 
-def print_warranty_label_large( prefix_text, counter_start, label_count ):
+def print_warranty_label_large( product, prefix_text, counter_start, label_count ):
 	""" Print the Warranty Label on the GK420t on 70mm width x 2.5mm height labels """
 
 	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
@@ -450,12 +456,15 @@ def print_warranty_label_large( prefix_text, counter_start, label_count ):
 		d.field( origin=(175,11), font=d.font('S',17,8), data= unicode( 'Garantie/Warranty') ) # use font E as default
 		d.field( origin=(175,62), font=d.font('T',17,8), data= unicode( '%s-%i' % (prefix_text, counter_start + label_counter) ) )# use font E as default
 
-		war_ean = "325%09d" % (counter_start + label_counter,)  #EAN12: 325<ID_warranty> 
+		war_ean = "325%09d" % (counter_start + label_counter,)  #EAN12: 325<ID_warranty>
 		d.ean13( origin=(500,11), ean=unicode(calculate_ean13(war_ean)), height_dots = 20 )
 		# d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
 
 		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, voir les conditions' )
 		d.field( origin=(175,145), font=d.font('C'), data=u'générales de ventes sur shop.mchobby.be' )
+
+		d.field( origin=(500,160), font=d.font('S',17,8), data=unicode(str(product.id)) )
+		d.ean13( origin=(175,160), ean=unicode(product.ean13), height_dots = 20 )
 
 
 		# End Print format
