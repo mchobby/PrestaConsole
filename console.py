@@ -791,7 +791,7 @@ class App( BaseApp ):
 		""" Search for the last order on the shop """
 		if len(params)>0:
 			_count = int( params[0] ) # use the id provided on the command line
-			if _count > 50:
+			if _count > 100:
 				raise ValueError( 'Count %i is too high! (50 max)' % _count )
 		else:
 			_count = 10

@@ -24,6 +24,7 @@ MA 02110-1301, USA.
 """
 
 import tempfile
+import codecs
 
 class PrestaOut( object ):
 	""" Class to manage the ouput of data to various streams """
@@ -71,7 +72,7 @@ class PrestaOut( object ):
 
 		# Create a new temporary file
 		self.filename = tempfile.mktemp( '-console-print.txt' )
-		self.fh = open( self.filename, 'w' )
+		self.fh = codecs.open( self.filename, 'w', 'utf-8' )
 		return self.filename
 
 	def close_temp_file( self ):
