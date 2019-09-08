@@ -395,7 +395,7 @@ class OrderShipApp():
 					self.output.save_carbon_copy( os.path.join( _path, _filename ) )
 					# Save all the joined order
 					for _joined_order in self.joined_order:
-						_joined_filename =  os.path.join( *(self.order_filename(self._joined_order) ))
+						_joined_filename =  os.path.join( *(self.order_filename(_joined_order) ))
 						with codecs.open( _joined_filename , 'w', 'utf-8' ) as f:
 							f.write( '--- Order ID : %s ---\r\n' % _joined_order.id )
 							f.write( 'JOINED TO ORDER : %s\r\n' % self.order.id )
