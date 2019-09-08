@@ -7,7 +7,7 @@ from output import PrestaOut
 from config import Config
 from pprint import pprint
 import logging
-import sys, os
+import sys, os, codecs
 import re, subprocess
 import signal
 import datetime
@@ -93,13 +93,13 @@ class OrderShipApp():
 		# Test the existence of data path and write access, raise exception in case of error
 		self.output.writeln( "Testing paths..." )
 		with open( os.path.join(self.config.order_ship_data_path, 'testfile.txt'), "a") as f:
-			f.write( 'test access @ %s' % datetime.datetime.now() )
+			f.write( 'test access @ %s \r\n' % datetime.datetime.now() )
 
 	def order_filename( self, order ):
 		""" Return a tuple (filepath, filename) to use in order to store the order-data """
 		# order.date_add have the format '2019-08-21 16:02:29'
-		# '2019-08-21 16:02:29' => '0821'
-		return ( os.path.join( self.config.order_ship_data_path, order.date_add.replace('-','')[4:8] ), '%s.scan' % order.id )
+		# '2019-08-21 16:02:29' => '201908'... Store by year and month
+		return ( os.path.join( self.config.order_ship_data_path, order.date_add.replace('-','')[0:6] ), '%s.scan' % order.id )
 
 	def is_order_file_exists( self, order ):
 		""" Check if a data file is already stored for that order """
@@ -226,11 +226,13 @@ class OrderShipApp():
 		cmd_type,cmd_data, cmd_mult = CMD.RAW, '', 1
 		while not((cmd_type==CMD.RAW) and (cmd_data.upper()=='EXIT')):
 			cmd_type,cmd_data,cmd_mult = self.get_cmd( prompt="%-13s > "%AppState(self.state).name, debug=False)
+
 			# -- Append extra info to CarbonCopy -------------------------------
 			self.output.carbon_copy.append(  'CMD: %s, %s, %s' % (cmd_type,cmd_data,cmd_mult))
 			# -- Reset All -----------------------------------------------------
 			if (cmd_type == CMD.VERB and cmd_data == 'RESET' ):
 				self.reset_all()
+				continue
 
 			# -- Loading an order ----------------------------------------------
 			if (self.state == AppState.WAIT_ORDER) and (cmd_type == CMD.LOAD_ORDER):
@@ -245,6 +247,7 @@ class OrderShipApp():
 				if self.is_order_file_exists( orders[0] ):
 					self.output.writeln( "[ERROR] scanfile already exists for this order!" )
 					self.output.writeln( "[ERROR] %s/%s" % self.order_filename( orders[0]) )
+					self.beep()
 					continue # Skip remaining of loading
 
 				# Start managing the order
@@ -258,26 +261,17 @@ class OrderShipApp():
 				self.output.reset_carbon_copy() # we will keep a copy of everything
 				self.output.writeln( '--- Order ID : %i ---' % self.order.id )
 				# self.output.writeln( 'Shop ID      : %s' % order.id_shop )
-				# print( 'Carrier   ID : %i' % order.id_carrier )
-				# print( 'current state: %i' % order.current_state )
-				# print( 'Customer  ID : %i' % order.id_customer )
 				self.output.writeln( 'Customer     : %s' % self.customer.customer_name )
 				self.output.writeln( 'Cust.EMail   : %s' % self.customer.email )
-				#self.output.writeln( 'Carrier      : %s' % self.cachedphelper.carriers.carrier_from_id( order.id_carrier ).name )
 				self.output.writeln( 'Order Date   : %s' % self.order.date_add )
-				#self.output.writeln( 'Current State: %s @ %s' % ( self.cachedphelper.order_states.order_state_from_id( order.current_state ).name, order.date_upd) )
-				#self.output.writeln( 'valid        : %i' % order.valid )
-				#self.output.writeln( 'payment      : %s' % order.payment )
-				#self.output.writeln( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
-				#self.output.writeln( 'total Paid   : %.2f' % order.total_paid )
-				#self.output.writeln( 'Shipping Nr  : %s'   % order.shipping_number )
-				#self.output.writeln( '' )
+
 
 				# Content the order
 				self.scan = {}
 				for row in self.order.rows:
 					self.output.writeln( row )
 					self.scan[row.id_product] = 0
+				continue
 
 			# -- Scan Product --------------------------------------------------
 			if (cmd_type == CMD.SCAN_PRODUCT):
@@ -298,6 +292,7 @@ class OrderShipApp():
 					else:
 						self.output.writeln( "[ERROR] Product %s not in the order!" % cmd_data )
 						self.beep()
+				continue
 
 			# -- Append order --------------------------------------------------
 			# User selected APPEND ORDER carcode
@@ -309,6 +304,7 @@ class OrderShipApp():
 					self.output.writeln("SELECT order TO APPEND to shipping!")
 					self.state = AppState.APPEND_ORDER
 					self.beep( notif=True )
+				continue
 
 			# user selected an order
 			if (self.state == AppState.APPEND_ORDER) and (cmd_type == CMD.LOAD_ORDER):
@@ -323,6 +319,7 @@ class OrderShipApp():
 				if self.is_order_file_exists( orders[0] ):
 					self.output.writeln( "[ERROR] scanfile already exists for this order!" )
 					self.output.writeln( "[ERROR] %s/%s" % self.order_filename( orders[0]) )
+					self.beep()
 					continue # Skip remaining of loading
 
 				# Start appending the loaded order
@@ -340,11 +337,13 @@ class OrderShipApp():
 
 				self.output.writeln( "Order %i succesfuly added" % orders[0].id )
 				self.state = AppState.CONTROL_ORDER # Return to control order state
+				continue
 
 			# user selected CANCEL BarCode
 			if (self.state == AppState.APPEND_ORDER) and (cmd_type == CMD.VERB and cmd_data == 'CANCEL' ):
 				self.output.writeln( "Order appending canceled!")
 				self.state = AppState.CONTROL_ORDER
+				continue
 
 			# -- Capture Carrier -----------------------------------------------
 			if (cmd_type == CMD.SET_CARRIER ):
@@ -355,6 +354,7 @@ class OrderShipApp():
 					self.state = AppState.WAIT_SHIPPING
 					self.carrier = cmd_data
 					self.beep( notif=True )
+				continue
 
 			# -- Capture Number -----------------------------------------------
 			if ((cmd_type == CMD.RAW) and (self.state == AppState.WAIT_SHIPPING) ):
@@ -362,6 +362,7 @@ class OrderShipApp():
 					self.shipping_number = cmd_data
 					# GetBack to previous state
 					self.state = AppState.CONTROL_ORDER
+				continue
 
 			# -- Check ---------------------------------------------------------
 			if (cmd_type == CMD.VERB and cmd_data == 'CHECK' ):
@@ -374,6 +375,7 @@ class OrderShipApp():
 						self.beep()
 					else:
 						self.beep( success=True )
+				continue
 
 			# -- Finalize ------------------------------------------------------
 			if (cmd_type == CMD.VERB and cmd_data == 'FINALIZE' ):
@@ -386,11 +388,24 @@ class OrderShipApp():
 						continue
 					self.output.writeln("")
 					self.output.writeln("ORDER CHECK SUCCESSFULLY")
-					# Save the scan files.
+					# Save the scan file.
 					_path, _filename = self.order_filename(self.order)
 					self.output.save_carbon_copy( os.path.join( _path, _filename ) )
+					# Save all the joined order
+					for _joined_order in self.joined_order:
+						_joined_filename =  os.path.join( *(self.order_filename(self._joined_order) ))
+						with codecs.open( _joined_filename , 'w', 'utf-8' ) as f:
+							f.write( '--- Order ID : %s ---\r\n' % _joined_order.id )
+							f.write( 'JOINED TO ORDER : %s\r\n' % self.order.id )
+							f.write( 'SEE SCAN : %s\r\n' % os.path.join( _path, _filename ) ) # Mention original filename1
+					# Reset for next scan session
 					self.reset_all()
 					self.beep( success=True )
+					continue
+
+			# == Reaching this Point --> Error ===s==============================
+			self.output.writeln("[ERROR] UNKNOWN instruction scan or ean scan!")
+			self.beep()
 
 		self.output.writeln( 'User exit!' )
 
