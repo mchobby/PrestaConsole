@@ -388,6 +388,8 @@ class OrderShipApp():
 						continue
 					self.output.writeln("")
 					self.output.writeln("ORDER CHECK SUCCESSFULLY")
+					self.output.writeln("")
+					self.output.writeln( 'OPERATION DATE : %s' % datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") )
 					# Save the scan file.
 					_path, _filename = self.order_filename(self.order)
 					self.output.save_carbon_copy( os.path.join( _path, _filename ) )
@@ -398,6 +400,7 @@ class OrderShipApp():
 							f.write( '--- Order ID : %s ---\r\n' % _joined_order.id )
 							f.write( 'JOINED TO ORDER : %s\r\n' % self.order.id )
 							f.write( 'SEE SCAN : %s\r\n' % os.path.join( _path, _filename ) ) # Mention original filename1
+							f.write( 'OPERATION DATE : %s' % datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") )
 					# Reset for next scan session
 					self.reset_all()
 					self.beep( success=True )
