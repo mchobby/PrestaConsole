@@ -6,6 +6,7 @@ console.startup
 console.sh
 cachefile.pkl
 logfile.log
+pushgit.sh
 
 lcdmtrx
 test
