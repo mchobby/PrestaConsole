@@ -7,6 +7,7 @@ from ConfigParser import ConfigParser
 CONFIG_FILENAME = 'config.ini'
 # Sections names
 CONFIG_SECTION_PRESTAAPI = 'PRESTA-API'
+CONFIG_SECTION_APP = 'APP'
 CONFIG_SECTION_DEBUG = 'DEBUG'
 CONFIG_SECTION_LCD = 'LCD-DISPLAY'
 CONFIG_SECTION_COMPANY = 'COMPANY'
@@ -16,6 +17,9 @@ CONFIG_SECTION_ORDER_SHIP = 'ORDER-SHIP'
 # Keynames for section PRESTA-API
 CONFIG_KEY_KEY = 'key'
 CONFIG_KEY_URL = 'url'
+
+# Keynames for section PRESTA-API
+CONFIG_KEY_PROMPT = 'prompt'
 
 # Keynames for section DEBUG
 CONFIG_KEY_LOGFILE = 'logfile'
@@ -40,6 +44,7 @@ class Config(object):
 	"""read paramters from the "config.ini" configuration file"""
 	_presta_api_key = 'None'
 	_presta_api_url = 'None'
+	_app_prompt     = ''
 	_logfile = 'None'
 	_lcd_device = 'None'
 
@@ -59,6 +64,9 @@ class Config(object):
 
 		self._presta_api_key = config.get( CONFIG_SECTION_PRESTAAPI, CONFIG_KEY_KEY )
 		self._presta_api_url = config.get( CONFIG_SECTION_PRESTAAPI, CONFIG_KEY_URL )
+
+		self._app_prompt = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PROMPT )
+
 		self._logfile = config.get( CONFIG_SECTION_DEBUG, CONFIG_KEY_LOGFILE )
 		self._lcd_device = config.get( CONFIG_SECTION_LCD, CONFIG_KEY_DEVICE_PATH )
 
@@ -112,6 +120,11 @@ class Config(object):
 		""" target url to join the PrestaShop API with the Key.
 		Should be http://shop.my_domain_name.be/api"""
 		return self._presta_api_url
+
+	@property
+	def prompt( self ):
+		""" The prompt to be displayed in the front of command prompt """
+		return self._app_prompt
 
 	@property
 	def logfile( self ):

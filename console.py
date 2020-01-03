@@ -27,7 +27,7 @@ MA 02110-1301, USA.
 import warnings
 warnings.filterwarnings("ignore")
 
-from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList
+from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList, OrderStateList
 from output import PrestaOut
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
@@ -79,11 +79,12 @@ def progressHandler( prestaProgressEvent ):
 NOPE = -1
 
 class CmdParse(cmd.Cmd):
-	prompt = '> '
+	# prompt = "? "
 	#def do_listall(self, line):
 	#	print(commands)
-	def __init__( self, cmd_callback ):
+	def __init__( self, cmd_callback, prompt_prefix='' ):
 		cmd.Cmd.__init__( self )
+		cmd.Cmd.prompt = '%s> ' %  prompt_prefix
 		self.cmd_callback = cmd_callback
 
 	def default(self, line):
@@ -102,8 +103,8 @@ class BaseApp( object ):
 		:params keywords: keywords and their equivalent
 		:params commands: supported commands and parameters count
 		"""
-		self.cmd_parse = CmdParse( self.cmd_parse_callback )
 		self.config = Config()
+		self.cmd_parse = CmdParse( self.cmd_parse_callback, self.config.prompt )
 		self.KEYWORDS = keywords
 		self.COMMANDS = commands
 		self.output = PrestaOut()
@@ -284,6 +285,8 @@ KEYWORDS = {
 # Commands + Needed parameters + function to call
 #    Needed Parameter '+': 1 or more, '*': 0 or mode, numeric (exactly X values)
 COMMANDS = [
+	('test'           , '*' ),
+	('eand'           , 1   ),
 	('ean'            , 1   ),
 	('calc ean'       , 1   ),
 	('help'           , 0   ),
@@ -349,6 +352,7 @@ class App( BaseApp ):
 						 'show-product-label': '0',
 						 'show-product-qm'   : '0',
 						 'show-product-qo'   : '0',
+						 'show-product-ean'  : '0',
 						 'inactive-product'  : '0',
 						 'include-it'        : '0',
 						 'label-separator'   : '0',
@@ -456,8 +460,8 @@ class App( BaseApp ):
 		if isinstance( psr_list[0], ToteItem ):
 			sTitle += '%7s | ' % 'ordered'
 			sPrint += '%7i | '
-		sTitle += '%7s | %-30s | %5s' % ('ID', 'Reference', 'stock' )
-		sPrint += '%7i | %-30s | %5i'
+		sTitle += '%9s | %-30s | %5s' % ('ID', 'Reference', 'stock' )
+		sPrint += '%9i | %-30s | %5i'
 		if self.options['show-product-qm']=='1':
 			sTitle += ' | %5s | %3s' % ('QM', '/!\\' )
 			sPrint += ' | %5s | %3s'
@@ -473,6 +477,9 @@ class App( BaseApp ):
 		if self.options['show-product-pv'] == '1':
 			sTitle += ' | %15s' % 'P.V. (PV ttc)'
 			sPrint += ' | %6.2f (%6.2f)'
+		if self.options['show-product-ean'] == '1':
+			sTitle += ' | %15s' % 'EAN'
+			sPrint += ' | %15s'
 		sTitle += ' | %-20s' % 'Supp. Ref.'
 		sPrint += ' | %-50s'
 
@@ -533,6 +540,8 @@ class App( BaseApp ):
 			if self.options['show-product-pv'] == '1':
 				_lst.append( psr.product_data.price )
 				_lst.append( psr.product_data.price_ttc )
+			if self.options['show-product-ean'] == '1':
+				_lst.append( psr.product_data.ean13 )
 			_lst.append( psr.supplier_refs )
 
 			# Go for display
@@ -570,6 +579,64 @@ class App( BaseApp ):
 	#   COMMANDs execution
 	#
 	# ---------------------------------------------------------------------------
+	def do_test( self, params ):
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID cmd'
+		_id = int( params[0] )
+
+		# test_order_history( _id )
+		# self.test_save_order( 14286 ) # An order from Dominique
+		self.cachedphelper.get_products( )
+
+	def test_save_order( self, _id ):
+		""" TEST: read, set status=Shipping, set Shipping_nr THEN save the order.
+			If configured proprely, this will also send the shipping mail.
+
+			:param _id: order id (EG. 14286) """
+
+		# Load an order
+		_data = self.cachedphelper.get_order_data( _id )
+		from xml.etree import ElementTree
+		# Change the Order Status
+		order = list( _data )[0]
+		order_properties = list( order )
+		order_current_state = [ order_property for order_property in order_properties if order_property.tag == 'current_state' ]
+		if order_current_state[0].text == str( OrderStateList.ORDER_STATE_SHIPPING ):
+			raise Exception( 'Order %s already in SHIPPING status' % _id )
+		# Update the status in XML Document
+		# <current_state xmlns:ns0="http://www.w3.org/1999/xlink" ns0:href="https://dev.mchobby.be/api/order_states/3">4</current_state>
+		order_current_state[0].text = str( OrderStateList.ORDER_STATE_SHIPPING )
+		order_current_state[0].set( '{http://www.w3.org/1999/xlink}href', 'https://dev.mchobby.be/api/order_states/%s'%OrderStateList.ORDER_STATE_SHIPPING )
+		# Update Shipping Number --> Simplier way
+		_el = _data.find('order').find('shipping_number')
+		_el.text = '444719'
+
+		# Debugging
+		# print( ElementTree.tostring(_data) )
+		# import pdb; pdb.set_trace()
+
+		# Send the Data to PrestaShop. It will reread the data and return it
+		# (so the order) as an ElementTree
+		result = self.cachedphelper.post_order_data( _data )
+		# print( ElementTree.tostring(result) )
+
+	def test_order_history( self, _id ):
+		""" TEST: order history inspection """
+		# --- Historique de commande (changement de status) --------------------
+		print( "ID : %s" % _id )
+		_data = self.cachedphelper.get_order_data( _id )
+		from xml.etree import ElementTree
+		print( ElementTree.tostring(_data) )
+		print( "-"*80 )
+
+		#_data = self.cachedphelper.webservice.get( 'order_histories', 22887 )
+		_data = self.cachedphelper.search( 'order_histories', options={'filter[id_order]': _id} )
+		print( ElementTree.tostring(_data) )
+
+		_data = self.cachedphelper.webservice.get( 'order_histories', 91240 )
+		print( ElementTree.tostring(_data) )
+		_data = self.cachedphelper.webservice.get( 'order_histories', 91241 )
+		print( ElementTree.tostring(_data) )
+
 	def do_bag( self, params ):
 		""" View the content of the bag (shopping basket """
 		#def view_bag( cachedphelper, bag, max_row=None, desc=False ):
@@ -695,6 +762,14 @@ class App( BaseApp ):
 		product_ean = '32321%07i' % _id  # prefix 3232 + product 1 + id_product
 		product_ean = calculate_ean13( product_ean ) # Add the checksum to 12 positions
 		self.output.writeln( '%s' % product_ean )
+
+	def do_eand( self, params ):
+		""" Generates the EAN13 for the Declination ID_Product (ID+<00>+ID_Product)"""
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
+		_id = int( params[0] )
+		declination_product_ean = '33%010i' % _id  # prefix 3232 + product 1 + id_product
+		declination_product_ean = calculate_ean13( declination_product_ean ) # Add the checksum to 12 positions
+		self.output.writeln( '%s' % declination_product_ean )
 
 	def do_calc_ean( self, params ):
 		""" Caclulate the check digit of EAN (on 12 positions) """
@@ -1003,11 +1078,26 @@ class App( BaseApp ):
 		else:
 			_id = int( params[0] ) # use the id provided on the command line
 
+		# Try to catch a simple product
 		p = self.cachedphelper.products.product_from_id( _id )
 		if not( p ):
-			self.output.writeln( 'No product ID %s' % _id )
+			# If the ID is not found... maybe it is a combination product (so several product for a base id_product)
+			# Just create a list with the found combination products
+			_ids = self.cachedphelper.products.product_combinations( _id )
+			if len(_ids)==0:
+				self.output.writeln( 'No product ID %s' % _id )
+				return
+			# Else display the list of combinations
+			self.output.writeln( " " )
+			# Just show it
+			for id_combination in _ids:
+				self.output.writeln( "%s" % ("-"*40) )
+				self.do_show_product( [str(id_combination)] )
+				self.output.writeln( " " )
+			self.output.writeln( "%i combinations for product %s!" % (len(_ids),_id) )
 			return
 
+		# Display information about simple product
 		_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _id )
 		try:
 			_margin = (p.price-p.wholesale_price) / p.wholesale_price * 100

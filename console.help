@@ -113,6 +113,12 @@ ean <ID> :
   Calculate the product EAN13 of <ID> and display it on the console
 	ean 127 --> 3232100001275
 
+eand <DECLINATION_ID> :
+
+	  Calculate the Declination EAN13 of <DECLINATION_ID> and display it on the console.
+		A declination ID is based on the following structure <declination_id> + <00> + <product_id>
+		ean 1500127 --> 3300015001274
+
 
 calc ean <12digits>
 

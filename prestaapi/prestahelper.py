@@ -19,6 +19,15 @@ from datetime import datetime
 
 PRESTA_UNDEFINE_INT = -1
 
+def save_to_file( base_name, el ):
+	""" Helper: Save the readable version of the element tree for easy debugging.
+	    file will be created with .debug.xml suffix """
+	filename = "%s.debug.xml" % base_name
+	import codecs
+	with codecs.open(filename, "w", "utf-8-sig") as temp:
+		temp.write( ElementTree.tostring( el ) )
+	print( "%s saved!" % filename )
+
 def etree_to_dict(t):
     d = {t.tag: {} if t.attrib else None}
     children = list(t)
@@ -126,6 +135,11 @@ class PrestaHelper(object):
 		self.__debug = value
 		self.__prestashop.debug = value
 
+	@property
+	def webservice( self ):
+		""" Direct access to the underlying WebService (if needed). """
+		return self.__prestashop
+
 	def search( self, pattern, options ):
 		""" Giving access to search capability of underlaying PrestaShop WebService """
 
@@ -221,14 +235,17 @@ class PrestaHelper(object):
 		""" retreive a list of products from PrestaShop """
 		# combinations are used to create the various "declinaisons" of a single product
 		logging.debug( 'read combinations' )
-		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13]' } )
+		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price]' } )
 		_combinations = CombinationList( self )
 		_combinations.load_from_xml( el )
+		#print( ElementTree.tostring( el ) )
 
 		logging.debug( 'read products' )
 		#el = self.__prestashop.search( 'products' )
 		#print( ElementTree.tostring( el ) )
+
 		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13]'} )
+		#print( ElementTree.tostring( el ) )
 
 		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
 		_result.load_from_xml( el )
@@ -248,10 +265,11 @@ class PrestaHelper(object):
 	def get_product_suppliers( self ):
 		""" retreive the list of all the supplier for all the products """
 		logging.debug('read product suppliers')
-		el = self.__prestashop.search( 'product_suppliers', options = {'display': '[id,id_product,id_supplier,product_supplier_reference]'} )
+		el = self.__prestashop.search( 'product_suppliers', options = {'display': '[id,id_product,id_supplier,id_product_attribute,product_supplier_reference]'} )
 
 		_result = ProductSupplierList( self )
 		_result.load_from_xml( el )
+		#save_to_file( "get_product_suppliers", el )
 
 		return _result
 
@@ -336,7 +354,9 @@ class PrestaHelper(object):
 		return _result
 
 	def get_order_data( self, id ):
-		""" retreive the xml data for an order """
+		""" retreive the xml data for an order.
+
+		:returns: ElementTree with order content """
 		try:
 			return self.__prestashop.get( 'orders', id )
 		except PrestaShopWebServiceError as e:
@@ -345,11 +365,10 @@ class PrestaHelper(object):
 			else:
 				raise e
 
-	def post_order_data( self, id, el ):
-		""" Post a modified xml data of an order """
-		self.__prestashop.debug = True
-		print( ElementTree.tostring( el ) )
-		return self.__prestashop.edit( 'orders', id, el )
+	def post_order_data( self, el ):
+		""" Post a modified xml data of an order.
+		:returns:  ElementTree with order content """
+		return self.__prestashop.edit( 'orders', ElementTree.tostring( el ) )
 
 	def get_outofstock_orderable_ids( self ):
 		""" Locate the product IDs where advanced stock management is
@@ -517,7 +536,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 3
+	CACHE_FILE_VERSION = 4
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -1225,10 +1244,16 @@ class ProductSupplierList( BaseDataList ):
 			_data = ProductSupplierData( self.helper )
 			_data.id      = int( item['id'] )
 			_data.id_product = int( item['id_product']['#text'] )
+			# Is this a Combination product ?
+			if item['id_product_attribute'] != '0' :
+				_data.id_product = recompute_id_product( _data.id_product, int(item['id_product_attribute']['#text']))
+				#print( 'store productsupplier for id= %s' % _data.id_product )
 			_data.id_supplier = int( item['id_supplier']['#text'] )
 			_data.reference   = item['product_supplier_reference']
 			if _data.reference == None:
 				_data.reference = ''
+			if _data.id == 267800447:
+				print( _data.reference )
 			self.append( _data )
 
 	def pickle_data( self, fh ):
@@ -1517,7 +1542,7 @@ class CombinationData( BaseData ):
 
 	Remarks: directly loaded from the CombinationList class"""
 
-	__slots__ = ["id", "id_product", "reference", "ean13"]
+	__slots__ = ["id", "id_product", "reference", "ean13", "wholesale_price", "price"]
 
 	def load_from_xml( self, node ):
 		""" Initialise the data from a combination """
@@ -1525,7 +1550,7 @@ class CombinationData( BaseData ):
 
 	def __getstate__(self):
 		""" return the object state for pickeling """
-		return {"id":self.id, "id_product" : self.id_product, "reference" : self.reference, "ean13" : self.ean13 }
+		return {"id":self.id, "id_product" : self.id_product, "reference" : self.reference, "ean13" : self.ean13, "wholesale_price": self.wholesale_price, "price": self.price }
 
 	def __setstate__(self,dic):
 		""" Set the object state from unpickeling """
@@ -1533,6 +1558,8 @@ class CombinationData( BaseData ):
 		self.id_product     = dic['id_product']
 		self.reference      = dic['reference']
 		self.ean13 			= dic['ean13']
+		self.wholesale_price= dic['wholesale_price']
+		self.price			= dic['price']
 
 	def canonical_reference( self ):
 		""" Return the canonical search string of the reference.
@@ -1734,6 +1761,11 @@ class CombinationList( BaseDataList ):
 			_data.id_product = int( item['id_product']['#text'] )
 			_data.reference  = item['reference'] if item['reference']!= None else ''
 			_data.ean13      = item['ean13'] if item['ean13']!=None else ''
+			_data.wholesale_price = float( item['wholesale_price'] )
+			if( item['price'] == None ):
+				_data.price = 0
+			else:
+				_data.price           = float( item['price'] )
 			# Auto-switch from EAN12 to EAN13
 			# Damned PrestaShop accept EAN12 instead of ean13!?!?
 			if len(_data.ean13) == 12:
@@ -1753,8 +1785,24 @@ class CombinationList( BaseDataList ):
 		return None if len(_r)==0 else _r
 
 	def recompute_id_product( self, id_product, id_combination ):
-		return id_combination*100000+id_product
+		return recompute_id_product( id_product, id_combination )
 
+	def unmangle_id_product( self, computed_id_product ):
+		return unmangle_id_product( computed_id_product )
+
+def recompute_id_product( id_product, id_combination ):
+	""" Compute an unique product ID named recompute_id_product based on (id_product, id_combination) """
+	return id_combination*100000+id_product
+
+def unmangle_id_product( computed_id_product ):
+	""" Make the opposite of recompute_id_product. returns (id_product, id_combination) """
+	id_combination = int(computed_id_product/100000)
+	id_product     = computed_id_product - (id_combination*100000)
+	return id_product, id_combination
+
+def is_combination( id_product ):
+	""" Check if the ID_product is a recompute_id_product """
+	return (id_product >= 100000)
 
 class BaseProductList( BaseDataList ):
 	""" List of product. Base class that can be derivated """
@@ -1823,6 +1871,8 @@ class BaseProductList( BaseDataList ):
 					_data = create_from_item( item )
 					_data.reference = _combination.reference
 					_data.ean13     = _combination.ean13
+					_data.wholesale_price = _combination.wholesale_price
+					_data.price 		  = _combination.price
 					# recompute an unique id_product (1 for 99.999 products)
 					_data.id        = self.combinationlist.recompute_id_product( _combination.id_product, _combination.id )
 
@@ -1885,6 +1935,16 @@ class BaseProductList( BaseDataList ):
 				if item.id == id_product:
 					return item
 		return None
+
+	def product_combinations( self, id_product ):
+		""" Retreive the combination IDs for a given id_product """
+		lst = []
+		for item in self:
+			if is_combination( item.id ):
+				_id_product,_id_combination = unmangle_id_product( item.id )
+				if _id_product == id_product:
+					lst.append( item.id ) # this is a combination id
+		return lst
 
 	def productinfo_from_id( self, id_product ):
 		""" Return a tuple with the  ProductData.reference and
