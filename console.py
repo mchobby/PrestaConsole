@@ -1096,7 +1096,7 @@ class App( BaseApp ):
 				self.output.writeln( " " )
 			self.output.writeln( "%i combinations for product %s!" % (len(_ids),_id) )
 			for id_combination in _ids:
-				self.output.writeln( '  %10s : %s' % (id_combination,self.cachedphelper.products.product_from_id(id_combination) ))
+				self.output.writeln( '  %10s : %s' % (id_combination,self.cachedphelper.products.product_from_id(id_combination).reference ))
 			return
 
 		# Display information about simple product
