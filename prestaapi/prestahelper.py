@@ -237,8 +237,8 @@ class PrestaHelper(object):
 		logging.debug( 'read combinations' )
 		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price]' } )
 		_combinations = CombinationList( self )
+		#save_to_file( 'get_products_combinations', el )
 		_combinations.load_from_xml( el )
-		#print( ElementTree.tostring( el ) )
 
 		logging.debug( 'read products' )
 		#el = self.__prestashop.search( 'products' )
@@ -1758,7 +1758,11 @@ class CombinationList( BaseDataList ):
 			# print( item )
 			_data = CombinationData( self.helper )
 			_data.id         = int( item['id'] )
-			_data.id_product = int( item['id_product']['#text'] )
+			try:
+				_data.id_product = int( item['id_product']['#text'] )
+			except Exception as e:
+				print( e )
+				raise e
 			_data.reference  = item['reference'] if item['reference']!= None else ''
 			_data.ean13      = item['ean13'] if item['ean13']!=None else ''
 			_data.wholesale_price = float( item['wholesale_price'] )
