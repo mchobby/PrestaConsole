@@ -1689,6 +1689,7 @@ class StockAvailableList( BaseDataList ):
 	def load_from_xml( self, node ):
 		""" Load the stock available list with data comming from prestashop search.
 			Must contains nodes: id, id_product, ... """
+		save_to_file( 'StockAvailableList.load_from_xml', node)
 		items = etree_to_dict( node )
 		items = items['prestashop']['stock_availables']['stock_available']
 		for item in items:
@@ -1756,13 +1757,14 @@ class CombinationList( BaseDataList ):
 	""" List of product combination """
 
 	def load_from_xml( self, node ):
+		save_to_file('CombinationList.load_from_xml', node) # Debug
 		items = etree_to_dict( node )
 		#print( items )
 		items = items['prestashop']['combinations']['combination']
 		for item in items:
 			# Sometime, the combination does not contains a valid ID_product
 			if not( '#text' in item['id_product'] ):
-				print( "Combination: record id %s as invalid id_product %s" % (item['id'], item['id_product']) )				
+				print( "Combination: record id %s as invalid id_product %s" % (item['id'], item['id_product']) )
 				continue
 			# print( item )
 			_data = CombinationData( self.helper )
