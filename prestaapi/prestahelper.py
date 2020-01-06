@@ -1861,7 +1861,7 @@ class BaseProductList( BaseDataList ):
 
 		# empty the list previously loaded
 		self.inactivelist = []
-
+		save_to_file( "BaseProductList.load_from_xml", node )
 		items = etree_to_dict( node )
 		#print( items )
 		items = items['prestashop']['products']['product']
