@@ -1762,7 +1762,7 @@ class CombinationList( BaseDataList ):
 				_data.id_product = int( item['id_product']['#text'] )
 			except Exception as e:
 				print( e )
-				print( 'Donnée: %s' % item['id_product']['#text'] )
+				print( 'Donnée: %s' % item['id_product'] )
 				raise e
 			_data.reference  = item['reference'] if item['reference']!= None else ''
 			_data.ean13      = item['ean13'] if item['ean13']!=None else ''
