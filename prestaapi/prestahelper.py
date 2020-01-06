@@ -1692,6 +1692,10 @@ class StockAvailableList( BaseDataList ):
 		items = etree_to_dict( node )
 		items = items['prestashop']['stock_availables']['stock_available']
 		for item in items:
+			# Sometime, the stock_available does not contains a valid ID_product
+			if not( '#text' in item['id_product'] ):
+				continue
+
 			_data = StockAvailableData( self.helper )
 			_data.id               = int( item['id'] )
 			_data.id_product       = int( item['id_product']['#text'] )
