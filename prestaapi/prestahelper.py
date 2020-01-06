@@ -1755,15 +1755,13 @@ class CombinationList( BaseDataList ):
 		#print( items )
 		items = items['prestashop']['combinations']['combination']
 		for item in items:
+			# Sometime, the combination does not contains a valid ID_product
+			if not( '#text' in item['id_product'] ):
+				continue
 			# print( item )
 			_data = CombinationData( self.helper )
 			_data.id         = int( item['id'] )
-			try:
-				_data.id_product = int( item['id_product']['#text'] )
-			except Exception as e:
-				print( e )
-				print( 'Donnée: %s' % item['id_product'] )
-				raise e
+			_data.id_product = int( item['id_product']['#text'] )
 			_data.reference  = item['reference'] if item['reference']!= None else ''
 			_data.ean13      = item['ean13'] if item['ean13']!=None else ''
 			_data.wholesale_price = float( item['wholesale_price'] )
