@@ -12,6 +12,8 @@ lcdmtrx
 test
 pypcl
 
+*.debug.xml
+
 # Ignorer les fichier python compilé
 *.pyc
 
