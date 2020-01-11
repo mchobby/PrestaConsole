@@ -27,7 +27,7 @@ MA 02110-1301, USA.
 import warnings
 warnings.filterwarnings("ignore")
 
-from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList, OrderStateList
+from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList, OrderStateList, recompute_id_product, unmangle_id_product, is_combination
 from output import PrestaOut
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
@@ -1096,11 +1096,26 @@ class App( BaseApp ):
 				self.output.writeln( " " )
 			self.output.writeln( "%i combinations for product %s!" % (len(_ids),_id) )
 			for id_combination in _ids:
-				self.output.writeln( '  %10s : %s' % (id_combination,self.cachedphelper.products.product_from_id(id_combination).reference ))
+				_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( id_combination )
+				_qty = _sa.quantity if _sa else None
+				self.output.writeln( '  %10s : %-30s : %s' % (id_combination,self.cachedphelper.products.product_from_id(id_combination).reference,_qty) )
 			return
 
 		# Display information about simple product
 		_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _id )
+		# _id may contains a base ID_Product (200) ID or an ID_Product_Combination (178500401)
+		# So we need to be sure to obtain a base product in any case
+		print( 'id : %s ' % _id )
+		print( 'product data:' )
+		print( p.advanced_stock_management )
+		if is_combination( _id):
+			print( "base product: %s" % unmangle_id_product(_id)[0] )
+			p_base = self.cachedphelper.products.product_from_id( unmangle_id_product(_id)[0] ) # find the base product from the combination product
+			print( p_base )
+		else:
+			print( "not a combination for %s" %_id)
+			p_base = p # The product is already a base product
+
 		try:
 			_margin = (p.price-p.wholesale_price) / p.wholesale_price * 100
 		except:
@@ -1112,13 +1127,18 @@ class App( BaseApp ):
 		self.output.writeln( 'P.A. (%%)   : %6.2f (%4.1f %%)' %  (p.wholesale_price,_margin) )
 		self.output.writeln( 'P.V. (TTC) : %6.2f (%6.2f)' % ( p.price, p.price_ttc ) )
 		self.output.writeln( ' ' )
-		if _sa:
+		# If stock_available (only reloabale for basic product)
+		if _sa and not(is_combination(_id)):
 			self.output.writeln( 'Qty        : %i ' % _sa.quantity )
 			if _sa.depends_on_stock != _sa.DEPENDS_ON_STOCK_SYNCH:
 				self.output.writeln( 'Stock Synch: NOT SYNCH !!! (manual stock)' )
 			if _sa.out_of_stock == _sa.OUT_OF_STOCK_ACCEPT_ORDER:
 				self.output.writeln( 'Out of Stock: ACCEPT ORDER !!!' )
-
+		elif is_combination(_id):
+			# For combination product, just check the advanced_stock_management flag on the products
+			if p.advanced_stock_management != 1:
+				self.output.writeln( 'Stock Synch: NO ADVANCED STOCK MANAGEMENT !!! (manual stock)' )
+				
 		# PARAMS
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )

@@ -419,7 +419,7 @@ class PrestaHelper(object):
 
 	def get_stockavailables( self ):
 		""" retreive the list of stock availables from PrestaShop """
-		el = self.__prestashop.search( 'stock_availables' , options={ 'display':'[id, id_product,quantity,depends_on_stock,out_of_stock]' } )
+		el = self.__prestashop.search( 'stock_availables' , options={ 'display':'[id, id_product,quantity,depends_on_stock,out_of_stock,id_product_attribute]' } )
 		_result = StockAvailableList( self )
 		_result.load_from_xml( el )
 
@@ -536,7 +536,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 4
+	CACHE_FILE_VERSION = 5
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -1643,7 +1643,7 @@ class ProductData( BaseData ):
 
 class StockAvailableData( BaseData ):
 	""" Contains the Stock_Available description data """
-	__slots__ = ["id", "id_product", "depends_on_stock", "out_of_stock", "quantity" ]
+	__slots__ = ["id", "id_product", "depends_on_stock", "out_of_stock", "quantity" ,"id_product_attribute"]
 
 	# How the WebShop should manage the product ordering when out of stock
 	OUT_OF_STOCK_NO_ORDER = 0     # Refuse order when out of stock
@@ -1659,7 +1659,8 @@ class StockAvailableData( BaseData ):
 
 	def __getstate__(self):
 		""" return state of the object for pickeling """
-		return { "id" : self.id, "id_product" : self.id_product, "depends_on_stock": self.depends_on_stock, "out_of_stock" : self.out_of_stock, "quantity" : self.quantity }
+		return { "id" : self.id, "id_product" : self.id_product, "depends_on_stock": self.depends_on_stock, "out_of_stock" : self.out_of_stock, "quantity" : self.quantity,
+		 		 "id_product_attribute" : self.id_product_attribute }
 
 	def __setstate__(self, dic):
 		""" set the state of the object based on dictionary """
@@ -1668,6 +1669,7 @@ class StockAvailableData( BaseData ):
 		self.depends_on_stock = dic['depends_on_stock']
 		self.out_of_stock 	  = dic['out_of_stock']
 		self.quantity 	  	  = dic['quantity']
+		self.id_product_attribute = dic['id_product_attribute']
 
 	def update_quantity( self ):
 		""" Force the refresh of the quantity to have an UptToDate qty """
@@ -1704,6 +1706,16 @@ class StockAvailableList( BaseDataList ):
 			_data.depends_on_stock = int( item['depends_on_stock'] )
 			_data.out_of_stock     = int( item['out_of_stock' ] )
 			_data.quantity         = int( item['quantity'] )
+			if "#text" in item['id_product_attribute']:
+				_data.id_product_attribute = int( item['id_product_attribute']['#text'] )
+			else:
+				_data.id_product_attribute = None
+			# Use the Internal ID_Product_combination when it applies
+			# 2 combinations for product 205!
+			# 		62000205 : HARIB-GUIM-COCO-200GR
+			#		62100205 : HARIB-GUIM-COCO-1KG
+			if _data.id_product_attribute:
+				_data.id_product = recompute_id_product( _data.id_product, _data.id_product_attribute )
 			self.append( _data )
 
 	def pickle_data( self, fh ):
