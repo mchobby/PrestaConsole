@@ -30,8 +30,10 @@ import logging
 import sys
 from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
-PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
-PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
+#PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
+PRINTER_SHORTLABEL_QUEUE_NAME = 'Zebra_Small'   # Small labels 25x30mm
+#PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
+PRINTER_LARGELABEL_QUEUE_NAME = 'Zebra_Large' # Large labels 25x70mm
 PRINTER_ENCODING = 'cp850'
 
 def request_qty( prompt = 'How many items ?'):
