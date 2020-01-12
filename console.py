@@ -107,6 +107,8 @@ class BaseApp( object ):
 		lp.printer_shortlabel_queue_name = self.config.printer_shortlabel_queue_name
 		lp.printer_largelabel_queue_name = self.config.printer_largelabel_queue_name
 		lp.printer_ticket_queue_name 	 = self.config.printer_ticket_queue_name
+		lp.shop_info_small = self.config.shop_info_small
+		lp.shop_info_large = self.config.shop_info_large
 
 		# initialize the logging
 		logging.basicConfig( filename=self.config.logfile, level=logging.INFO,

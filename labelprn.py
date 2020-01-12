@@ -36,6 +36,9 @@ printer_largelabel_queue_name = 'Undefined' # Large labels 25x70mm
 printer_ticket_queue_name     = 'Undefined' # Large labels 25x70mm
 PRINTER_ENCODING = 'cp850'
 
+shop_info_small = [] # Shop information for small Label
+shop_info_large = [] # Shop Information for Large Label
+
 def request_qty( prompt = 'How many items ?'):
 	""" Request a quantity and confirm it if greater than 25 """
 	value = raw_input( prompt )
@@ -299,8 +302,12 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 	# Write a BarCode field
 	d.ean13( origin=(130,80), ean=unicode(product_ean), height_dots = 50 )
 
-	d.field( origin=(130,160), font=d.font('C'), data=u'shop.mchobby.be' )
-	d.field( origin=(98,185), font=d.font('C'), data=u'MC Hobby sprl' )
+	global shop_info_small
+	if shop_info_small: # A list of string
+		for i in range( len(shop_info_small)):
+			d.field( origin=(98,(160+i*25)), font=d.font('C'), data=unicode( shop_info_small[i] ) )
+	#d.field( origin=(130,160), font=d.font('C'), data=u'shop.mchobby.be' )
+	#d.field( origin=(98,185), font=d.font('C'), data=u'MC Hobby sprl' )
 
 	d.field( origin=(265,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
 	# End Print format
@@ -341,8 +348,12 @@ def print_product_label_medium( product_id, product_ref, product_ean, qty ):
 	# Write a BarCode field
 	d.ean13( origin=(210,60), ean=unicode(product_ean), height_dots = 50 )
 
-	d.field( origin=(35,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
-	d.field( origin=(80,165), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	global shop_info_large
+	if shop_info_small: # A list of string
+		for i in range( len(shop_info_large)):
+			d.field( origin=(35,(140+i*25)), font=d.font('C'), data=unicode( shop_info_large[i] ) )
+	#d.field( origin=(35,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	#d.field( origin=(80,165), font=d.font('C'), data=u'Happy Electronic Hacking!' )
 
 	d.field( origin=(325,187), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
 	# End Print format
@@ -368,7 +379,6 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	#print product_ean
 	#print qty
 	global printer_largelabel_queue_name
-	print( printer_largelabel_queue_name )
 	medium = PrinterCupsAdapter( printer_queue_name = printer_largelabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 
@@ -385,8 +395,12 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
 	d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
 
-	d.field( origin=(225,150), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
-	d.field( origin=(255,175), font=d.font('C'), data=u'Happy Electronic Hacking!' )
+	global shop_info_large
+	if shop_info_large: # A list of string
+		for i in range( len(shop_info_large)):
+			d.field( origin=(225,(150+i*25)), font=d.font('C'), data=unicode( shop_info_large[i] ) )
+	#d.field( origin=(225,150), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
+	#d.field( origin=(255,175), font=d.font('C'), data=u'Happy Electronic Hacking!' )
 
 
 	# End Print format

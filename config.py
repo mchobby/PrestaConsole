@@ -24,6 +24,9 @@ CONFIG_KEY_PRINTER_SHORTLABEL_QUEUE_NAME = 'printer_shortlabel_queue_name'
 CONFIG_KEY_PRINTER_LARGELABEL_QUEUE_NAME = 'printer_largelabel_queue_name'
 CONFIG_KEY_PRINTER_TICKET_QUEUE_NAME     = 'printer_ticket_queue_name'
 
+CONFIG_KEY_SHOP_INFO_SMALL = 'shop_info_small'
+CONFIG_KEY_SHOP_INFO_LARGE = 'shop_info_large'
+
 # Keynames for section DEBUG
 CONFIG_KEY_LOGFILE = 'logfile'
 
@@ -72,6 +75,8 @@ class Config(object):
 		self._printer_shortlabel_queue_name = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_SHORTLABEL_QUEUE_NAME )
 		self._printer_largelabel_queue_name = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_LARGELABEL_QUEUE_NAME )
 		self._printer_ticket_queue_name     = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_TICKET_QUEUE_NAME )
+		self._shop_info_small = config.get( CONFIG_SECTION_APP, CONFIG_KEY_SHOP_INFO_SMALL )
+		self._shop_info_large = config.get( CONFIG_SECTION_APP, CONFIG_KEY_SHOP_INFO_LARGE )
 
 		self._logfile = config.get( CONFIG_SECTION_DEBUG, CONFIG_KEY_LOGFILE )
 		self._lcd_device = config.get( CONFIG_SECTION_LCD, CONFIG_KEY_DEVICE_PATH )
@@ -143,6 +148,21 @@ class Config(object):
 	@property
 	def printer_ticket_queue_name( self ):
 		return self._printer_ticket_queue_name
+
+	@property
+	def shop_info_small( self ):
+		""" Shop information to display on small labels """
+		return [ unicode(item) for item in self._shop_info_small.split( '/n') ]
+
+	@property
+	def shop_info_large( self ):
+		""" Shop information to display on small labels """
+		return [ unicode(item) for item in self._shop_info_large.split( '/n') ]
+
+	@property
+	def shop_info_small( self ):
+		""" Shop information to display on small labels """
+		return [ unicode(item) for item in self._shop_info_small.split( '/n') ]
 
 	@property
 	def logfile( self ):
