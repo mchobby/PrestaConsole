@@ -20,6 +20,9 @@ CONFIG_KEY_URL = 'url'
 
 # Keynames for section PRESTA-API
 CONFIG_KEY_PROMPT = 'prompt'
+CONFIG_KEY_PRINTER_SHORTLABEL_QUEUE_NAME = 'printer_shortlabel_queue_name'
+CONFIG_KEY_PRINTER_LARGELABEL_QUEUE_NAME = 'printer_largelabel_queue_name'
+CONFIG_KEY_PRINTER_TICKET_QUEUE_NAME     = 'printer_ticket_queue_name'
 
 # Keynames for section DEBUG
 CONFIG_KEY_LOGFILE = 'logfile'
@@ -66,6 +69,9 @@ class Config(object):
 		self._presta_api_url = config.get( CONFIG_SECTION_PRESTAAPI, CONFIG_KEY_URL )
 
 		self._app_prompt = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PROMPT )
+		self._printer_shortlabel_queue_name = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_SHORTLABEL_QUEUE_NAME )
+		self._printer_largelabel_queue_name = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_LARGELABEL_QUEUE_NAME )
+		self._printer_ticket_queue_name     = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_TICKET_QUEUE_NAME )
 
 		self._logfile = config.get( CONFIG_SECTION_DEBUG, CONFIG_KEY_LOGFILE )
 		self._lcd_device = config.get( CONFIG_SECTION_LCD, CONFIG_KEY_DEVICE_PATH )
@@ -125,6 +131,18 @@ class Config(object):
 	def prompt( self ):
 		""" The prompt to be displayed in the front of command prompt """
 		return self._app_prompt
+
+	@property
+	def printer_shortlabel_queue_name( self ):
+		return self._printer_shortlabel_queue_name
+
+	@property
+	def printer_largelabel_queue_name( self ):
+		return self._printer_largelabel_queue_name
+
+	@property
+	def printer_ticket_queue_name( self ):
+		return self._printer_ticket_queue_name
 
 	@property
 	def logfile( self ):

@@ -54,13 +54,7 @@ except Exception as err:
 
 from labelprn import handle_print_for_product, print_custom_label_small, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
 		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large, ean12_to_ean13
-# from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
-
-#RE_COMMAND                = "^\+([a-zA-Z])$"       # (command) +r OU +s
-#RE_COMMAND                 = "^(\w*)\s*(.*)\s*$"  # (command) +r ou +s
-                                                    # (command) <+demo> <param1 param2 paramN>
-
-#re_command       = re.compile( RE_COMMAND )
+from labelprn import printer_shortlabel_queue_name, printer_largelabel_queue_name , printer_ticket_queue_name
 
 def catch_ctrl_C(sig,frame):
     print "Il est hors de question d'autoriser la sortie sauvage!"
@@ -108,6 +102,11 @@ class BaseApp( object ):
 		self.KEYWORDS = keywords
 		self.COMMANDS = commands
 		self.output = PrestaOut()
+		# Initialize Printer Queue Names
+		import labelprn as lp
+		lp.printer_shortlabel_queue_name = self.config.printer_shortlabel_queue_name
+		lp.printer_largelabel_queue_name = self.config.printer_largelabel_queue_name
+		lp.printer_ticket_queue_name 	 = self.config.printer_ticket_queue_name
 
 		# initialize the logging
 		logging.basicConfig( filename=self.config.logfile, level=logging.INFO,
@@ -1138,7 +1137,7 @@ class App( BaseApp ):
 			# For combination product, just check the advanced_stock_management flag on the products
 			if p.advanced_stock_management != 1:
 				self.output.writeln( 'Stock Synch: NO ADVANCED STOCK MANAGEMENT !!! (manual stock)' )
-				
+
 		# PARAMS
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )

@@ -30,10 +30,10 @@ import logging
 import sys
 from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
-#PRINTER_SHORTLABEL_QUEUE_NAME = 'zebra-raw'   # Small labels 25x30mm
-PRINTER_SHORTLABEL_QUEUE_NAME = 'Zebra_Small'   # Small labels 25x30mm
-#PRINTER_LARGELABEL_QUEUE_NAME = 'zebra-raw-l' # Large labels 25x70mm
-PRINTER_LARGELABEL_QUEUE_NAME = 'Zebra_Large' # Large labels 25x70mm
+# Must be initialised with proper names
+printer_shortlabel_queue_name = 'Undefined' # Small labels 25x30mm
+printer_largelabel_queue_name = 'Undefined' # Large labels 25x70mm
+printer_ticket_queue_name     = 'Undefined' # Large labels 25x70mm
 PRINTER_ENCODING = 'cp850'
 
 def request_qty( prompt = 'How many items ?'):
@@ -115,8 +115,8 @@ def handle_print_for_product( product, params, separator=False ):
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			if separator:
 				print_custom_label_large(  '='*24, [u'%s x' % value, unicode(product.reference) ], 1 )
-			print_product_label_large( product.id, product.reference, product.ean13, int(value) )
-			return True
+		print_product_label_large( product.id, product.reference, product.ean13, int(value) )
+		return True
 
 def handle_print_custom_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
@@ -258,7 +258,8 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	global printer_shortlabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_shortlabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 
 	# Start a Print format
@@ -324,7 +325,8 @@ def print_product_label_medium( product_id, product_ref, product_ean, qty ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	global printer_shortlabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_shortlabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 
 	# Start a Print format
@@ -365,7 +367,9 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	global printer_largelabel_queue_name
+	print( printer_largelabel_queue_name )
+	medium = PrinterCupsAdapter( printer_queue_name = printer_largelabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,product_ref) )
 
 	# Start a Print format
@@ -407,7 +411,8 @@ def print_label_large( title, label, ean, qty=1 ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	global printer_largelabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_largelabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,title) )
 
 	# Start a Print format
@@ -445,8 +450,8 @@ def print_label_large( title, label, ean, qty=1 ):
 
 def print_warranty_label_large( product, prefix_text, counter_start, label_count ):
 	""" Print the Warranty Label on the GK420t on 70mm width x 2.5mm height labels """
-
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	global printer_largelabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_largelabel_queue_name )
 
 	for label_counter in range( label_count ):
 		d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = 'Warranty %s for %i' % (prefix_text, counter_start+counter_start + label_counter) )
@@ -494,7 +499,8 @@ def print_custom_label_large( label_title, label_lines, qty ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	global printer_largelabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_largelabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
 
 	# Start a Print format
@@ -531,8 +537,8 @@ def print_custom_label_king( label_title, label_title2, qty=1 ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels
 
 	label_title: title on the label (the only text to print) """
-
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_LARGELABEL_QUEUE_NAME )
+	global printer_largelabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_largelabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
 
 	# Start a Print format
@@ -577,7 +583,8 @@ def print_custom_label_small( label_title, label_lines, qty, ean=None ):
 	#print product_ref
 	#print product_ean
 	#print qty
-	medium = PrinterCupsAdapter( printer_queue_name = PRINTER_SHORTLABEL_QUEUE_NAME )
+	global printer_shortlabel_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_shortlabel_queue_name )
 	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,label_title) )
 
 	# Start a Print format
