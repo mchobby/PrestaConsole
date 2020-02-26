@@ -28,7 +28,8 @@ MA 02110-1301, USA.
 
 import logging
 import sys
-from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
+from pypcl import ZplDocument, PrinterCupsAdapter
+from prestaapi import calculate_ean13
 
 # Must be initialised with proper names
 printer_shortlabel_queue_name = 'Undefined' # Small labels 25x30mm
@@ -250,7 +251,115 @@ def handle_print_ean_label_large():
 
 # ===================================================================
 #
-#      BASIC PRINT FUNCTIONS
+#      BASIC ***TICKET*** FUNCTIONS
+#
+# ===================================================================
+
+def print_ticket_batch( batch, qty ):
+	""" Print the ticket labels for a batch  """
+	global printer_ticket_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_ticket_queue_name )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,batch.data.product_reference) )
+
+	# Start a Print format
+	d.format_start()
+	d.label_home( x_mm = 0, y_mm=7 )
+	d.label_length( length_mm=65 ) #40 mm
+	d.print_mode( d.PRINT_MODE_CUTTER )
+	d.media_tracking( d.MEDIA_TRACKING_CONTINUOUS )
+	# Set Quantity
+	if qty > 1:
+		d.print_quantity( qty )
+	_ref = batch.data.product_reference
+	d.field( origin=(120,40 ), font=d.font('G'), data= unicode( _ref[:13] ) )
+	d.field( origin=(120,100), font=d.font('G'), data= unicode( _ref[13:] ) )
+
+	#d.field( origin=(140,10), font=d.font('E'), data= unicode( batch.data.product_reference ) )
+	d.field( origin=(120,160), font=d.font('B'), data= unicode( batch.data.product_name ) )
+
+	# Write a BarCode field
+	d.ean13( origin=(200,185), ean=unicode( batch.data.product_ean), height_dots = 50 )
+
+	#Expiration: 05/2020
+	d.field( origin=(140,290), font=d.font('E'), data= unicode( 'Expire:') )
+	d.field( origin=(280,280), font=d.font('G'), data= unicode( batch.data.expiration ) )
+	# Write a BarCode field
+	_exp_ean = calculate_ean13( '326200%s' % batch.data.expiration.replace('/','') )
+	d.ean13( origin=(200,360), ean=unicode( _exp_ean ), height_dots = 20 )
+	d.field( origin=(140,425), font=d.font('E'), data= unicode( 'Lot: %s' % batch.data.batch_id ) )
+	# Draw a line
+	d.draw_box( 140, 460, 550, 1 )
+
+	d.format_end()
+
+	medium.open() # Open the media for transmission.
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue
+	finally:
+		medium.close()
+
+	del( medium )
+
+	for transformation in batch.transformations:
+		print_ticket_transformation( batch.data.batch_id , transformation, qty=transformation.label_count )
+
+def print_ticket_transformation( batch_id, transformation, qty ):
+	""" Print the ticket labels for a batch  """
+	global printer_ticket_queue_name
+	medium = PrinterCupsAdapter( printer_queue_name = printer_ticket_queue_name )
+	d = ZplDocument( target_encoding = PRINTER_ENCODING, printer_adapter = medium, title = '%i x %s' % (qty,transformation.target_product_reference) )
+
+	# Start a Print format
+	d.format_start()
+	d.label_home( x_mm = 0, y_mm=7 )
+	d.label_length( length_mm=65 ) #40 mm
+	d.print_mode( d.PRINT_MODE_CUTTER )
+	d.media_tracking( d.MEDIA_TRACKING_CONTINUOUS )
+	# Set Quantity
+	if qty > 1:
+		d.print_quantity( qty )
+	_ref = transformation.target_product_reference
+	d.field( origin=(120,40 ), font=d.font('G'), data= unicode( _ref[:13] ) )
+	d.field( origin=(120,100), font=d.font('G'), data= unicode( _ref[13:] ) )
+
+	#d.field( origin=(140,10), font=d.font('E'), data= unicode( batch.data.product_reference ) )
+	d.field( origin=(120,160), font=d.font('B'), data= unicode( transformation.target_product_name ) )
+
+	# Write a BarCode field
+	d.ean13( origin=(200,185), ean=unicode( transformation.target_product_ean), height_dots = 50 )
+
+	#Expiration: 05/2020
+	d.field( origin=(140,290), font=d.font('E'), data= unicode( 'Expire:') )
+	d.field( origin=(280,280), font=d.font('G'), data= unicode( transformation.expiration ) )
+	# Write a BarCode field
+	_exp_ean = calculate_ean13( '326200%s' % transformation.expiration.replace('/','') )
+	d.ean13( origin=(200,360), ean=unicode( _exp_ean ), height_dots = 20 )
+	d.field( origin=(140,425), font=d.font('E'), data= unicode( 'Lot: %s' % batch_id ) )
+	# Draw T
+	d.field( origin=(540,690), font=d.font('E'), data= unicode('T') )
+	d.draw_circle( 540,690, 20, tickness=3 )
+	# Draw a line
+	d.draw_box( 140, 460, 550, 1 )
+
+	d.format_end()
+
+	medium.open() # Open the media for transmission.
+				  # With CUPS medium this open a temporary file
+	try:
+		d.send()  # With CUPS medium this send the data to the temporary file
+		medium.flush() # With CUPS medium this close the temporary file and
+		               #   sends to file to the print queue
+	finally:
+		medium.close()
+
+	del( medium )
+
+# ===================================================================
+#
+#      BASIC ***LABEL*** PRINT FUNCTIONS
 #
 # ===================================================================
 
@@ -267,6 +376,7 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 
 	# Start a Print format
 	d.format_start()
+	d.field( origin=(120,11), font=d.font('E'), data= unicode( 'This is a test' ) )
 
 	# Set Quantity
 	if qty > 1:

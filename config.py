@@ -3,6 +3,7 @@
 """ Configuration management for PrestaConsole and others """
 
 from ConfigParser import ConfigParser
+from os.path import expanduser
 
 CONFIG_FILENAME = 'config.ini'
 # Sections names
@@ -19,7 +20,8 @@ CONFIG_KEY_KEY = 'key'
 CONFIG_KEY_URL = 'url'
 
 # Keynames for section PRESTA-API
-CONFIG_KEY_PROMPT = 'prompt'
+CONFIG_KEY_PROMPT     = 'prompt'
+CONFIG_KEY_BATCH_PATH = 'batch_path'
 CONFIG_KEY_PRINTER_SHORTLABEL_QUEUE_NAME = 'printer_shortlabel_queue_name'
 CONFIG_KEY_PRINTER_LARGELABEL_QUEUE_NAME = 'printer_largelabel_queue_name'
 CONFIG_KEY_PRINTER_TICKET_QUEUE_NAME     = 'printer_ticket_queue_name'
@@ -72,6 +74,11 @@ class Config(object):
 		self._presta_api_url = config.get( CONFIG_SECTION_PRESTAAPI, CONFIG_KEY_URL )
 
 		self._app_prompt = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PROMPT )
+		try:
+			self._batch_path = config.get( CONFIG_SECTION_APP, CONFIG_KEY_BATCH_PATH )
+		except:
+			self._batch_path = expanduser("~")
+
 		self._printer_shortlabel_queue_name = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_SHORTLABEL_QUEUE_NAME )
 		self._printer_largelabel_queue_name = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_LARGELABEL_QUEUE_NAME )
 		self._printer_ticket_queue_name     = config.get( CONFIG_SECTION_APP, CONFIG_KEY_PRINTER_TICKET_QUEUE_NAME )
@@ -136,6 +143,11 @@ class Config(object):
 	def prompt( self ):
 		""" The prompt to be displayed in the front of command prompt """
 		return self._app_prompt
+
+	@property
+	def batch_path( self ):
+		""" where are stored the batch files """
+		return self._batch_path if len( self._batch_path)>0 else None
 
 	@property
 	def printer_shortlabel_queue_name( self ):

@@ -42,8 +42,10 @@ import xml.etree.cElementTree as etree
 import tempfile
 import datetime
 from bag import ToteBag, ToteItem
+from batch import BatchFactory, EBatch
 import cmd
 import sys
+import re
 
 try:
 	from Tkinter import *
@@ -55,6 +57,7 @@ except Exception as err:
 from labelprn import handle_print_for_product, print_custom_label_small, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
 		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large, ean12_to_ean13
 from labelprn import printer_shortlabel_queue_name, printer_largelabel_queue_name , printer_ticket_queue_name
+from labelprn import print_ticket_batch, print_ticket_transformation
 
 def catch_ctrl_C(sig,frame):
     print "Il est hors de question d'autoriser la sortie sauvage!"
@@ -67,7 +70,65 @@ def progressHandler( prestaProgressEvent ):
 	else:
 		print( '%i/%i - %s' % ( prestaProgressEvent.current_step, prestaProgressEvent.max_step, prestaProgressEvent.msg ) )
 
+def request_text( prompt = 'text (+q to quit) ?', default=None ):
+	""" Request a text """
+	value = raw_input( prompt )
+	if value == '+q':
+		return None
+	if (value == '') and default:
+		return default
+	return value
 
+def request_re( prompt, re_string ):
+	""" Request a value and check it against a RE expression """
+	_re = re.compile( re_string )
+	while True:
+		value = request_text( prompt )
+		# Empty result
+		if value == None:
+			return None
+		# Re-match ?
+		_match = _re.match( value )
+		if not _match:
+			continue
+		return _match.string
+
+def request_expiration( prompt ):
+	""" Request an expiration date at format mm/yyyy """
+	while True:
+		value = request_re( prompt, re_string = "\d\d/\d\d\d\d")
+		if value == None:
+			return None
+		# check Month value
+		month, year = value.split( '/' )
+		if not( 1 <= int(month)<= 12 ):
+			print( "invalid month" )
+			continue
+		if not( 2019 <= int(year) <= 2034 ):
+			print( "invalid year" )
+			continue
+		return value
+
+def request_int( prompt = 'How many items ?', confirm_from_value=25 ):
+	""" Request a quantity and confirm it if greater than confirm_from_value """
+	value = raw_input( prompt )
+	if value == 0:
+		return None
+	if value == '+q':
+		return None
+	if value == '': # By default, 1 label
+		value = 1
+
+	qty = int( value )
+	if qty > confirm_from_value:
+		value2 = raw_input( 'Quantity > %s! Please confirm: ' % confirm_from_value )
+		if not value2.isdigit():
+			print( '%s is not a numeric value, ABORT!' % value2 )
+			return None
+		elif int(value2) != int(qty):
+			print( 'inconsistant values %s & %s' % (qty, value2) )
+			return	None
+	return qty
 
 # No command to execute
 NOPE = -1
@@ -114,6 +175,10 @@ class BaseApp( object ):
 		logging.basicConfig( filename=self.config.logfile, level=logging.INFO,
 							 format='%(asctime)s - [%(levelname)s] %(message)s',
 							 datefmt='%d/%m/%y %H:%M:%S.%f' )
+		# Just required to handle batch
+		self._batches = None # Access it via the batches property
+		if self.config.batch_path:
+			self._batches = BatchFactory( storage_path = self.config.batch_path )
 
 		# A CachedPrestaHelper is a PrestaHelper with cache capabilities
 		self.cachedphelper = CachedPrestaHelper( self.config.presta_api_url, self.config.presta_api_key, debug = False, progressCallback = progressHandler )
@@ -123,6 +188,13 @@ class BaseApp( object ):
 		#   cachedphelper.stock_availables.update_quantities()
 		#tester = CachedPrestaHelperTest( cachedphelper )
 		#tester.test_cache()
+
+	@property
+	def batches( self ):
+		""" Retreive a reference to the batch factory """
+		if not self._batches:
+			raise Exception( "No BatchFactory available! The [APP].batch_path has not been defined in the config.ini")
+		return self._batches
 
 	def _normalize_keyword( self, sCmd ):
 		""" try to replace each item of a command by it normalized item (otherwise the original value) """
@@ -279,7 +351,11 @@ KEYWORDS = {
 	'stock'   : ['s'],
 	'1'       : ['true'],
     '0'       : ['false'],
-	None      : ['from'] # remove any from and to
+	'batch new': ['nbatch'],
+	'batch print' : ['pbatch'],
+	'batch transform' : ['tbatch'],
+	'batch list' : ['lbatch'],
+	None       : ['from'] # remove any from and to
 
 }
 
@@ -296,6 +372,10 @@ COMMANDS = [
 	('bag import'     , 0   ),
 	('bag links'      , 0   ),
 	('bag'            , 0   ),
+	('batch new'      , 1   ),
+	('batch print'    , 1   ),
+	('batch transform', 1   ),
+	('batch list'     , '*' ),
 	('check stock config',0 ),
 	('editor begin'   , 0   ),
 	('editor end'     , 0   ),
@@ -337,6 +417,7 @@ COMMANDS = [
 	('upgrade'        , 0   )
 	]
 
+_last_tracability_info = ''
 
 class App( BaseApp ):
 	""" Handle the application """
@@ -586,7 +667,21 @@ class App( BaseApp ):
 
 		# test_order_history( _id )
 		# self.test_save_order( 14286 ) # An order from Dominique
-		self.cachedphelper.get_products( )
+		#self.cachedphelper.get_products( )
+		batch = self.batches.new_batch()
+		batch.data.product_id = 400
+		batch.data.product_reference = 'SUCET-BOUCHE-B-POP'
+		batch.data.product_name      = 'Sucette en forme de bouche - B-pop Mix'
+		batch.data.product_ean       = '3232100004009'
+		batch.data.creation_date     = datetime.datetime.now()
+		batch.data.expiration        = '05/2021' # 'mm/yyyy'
+		batch.data.label_count       = 2 # Number of printeed label
+		batch.data.info = 'Blablabla'
+		self.batches.save_batch( batch )
+
+		print_ticket_batch( batch, batch.data.label_count )
+		print( "Printed" )
+
 
 	def test_save_order( self, _id ):
 		""" TEST: read, set status=Shipping, set Shipping_nr THEN save the order.
@@ -705,6 +800,155 @@ class App( BaseApp ):
 			self.output.writeln( '   %8.2f Eur TTC/p (indicatif)' % (item.product.price*1.21) )
 			self.output.writeln( '   '+self.options['shop_url_product'].format( id=item.product.id )  )
 			self.output.writeln( ' ' )
+
+	def do_batch_new( self, params ):
+		""" Create a new batch with expiration information """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID Product'
+		global _last_tracability_info
+		_id = int( params[0] )
+		_p  = self.cachedphelper.products.product_from_id( _id )
+		if not(_p):
+			self.output.writeln( 'Invalid id product.' )
+			return
+		self.output.writeln( "--- PREPARING NEW BATCH for ID %s ---" % _id )
+		self.output.writeln( "  ref   : %s" % _p.reference )
+		self.output.writeln( "  label : %s" % _p.name )
+		_exp = request_expiration( 'Expiration MM/YYYY ? ')
+		if not _exp:
+			print( "User abord!" )
+			return
+		print( 'Tracability info   : %s' % _last_tracability_info )
+		_info = request_text( 'Tracability   (+q) ? ', default = _last_tracability_info)
+		if not(_info):
+			print( "User abord!" )
+			return
+		_last_tracability_info = _info # Remember for next time
+
+		_label_qty = request_int ( '# Label            ? ')
+		if not(_label_qty) or (_label_qty==0):
+			print( "User abord!" )
+			return
+
+		_confirm = request_text( 'CREATE NEW BATCH (y=1/.)? ', default = '0' )
+		if _confirm.upper() != '1':
+			print( "User abord!" )
+			return
+
+		# Save the batch
+		batch = self.batches.new_batch()
+		batch.data.product_id = _id
+		batch.data.product_reference = _p.reference
+		batch.data.product_name      = _p.name
+		batch.data.product_ean       = _p.ean13
+		batch.data.creation_date     = datetime.datetime.now()
+		batch.data.expiration        = _exp
+		batch.data.label_count       = _label_qty # Number of printeed label
+		batch.data.info 			 = _info
+		self.batches.save_batch( batch )
+
+		self.output.writeln( "Batch %i created!" % batch.data.batch_id )
+
+		while True:
+			_confirm = request_text( 'CREATE TRANSFORMATION (y=1/.)? ', default = '0' )
+			if not( _confirm.upper() in ('1','Y') ):
+				break
+			self.encode_batch_transformation( batch )
+
+		# Save tranformations if any
+		if len(batch.transformations)>0:
+			self.batches.save_batch( batch )
+			self.output.writeln( "Batch %i updated!" % batch.data.batch_id )
+
+		print_ticket_batch( batch, _label_qty )
+		self.output.writeln( "" )
+
+	def encode_batch_transformation( self, batch ):
+		""" Key-in a transformation for an existing batch """
+		# search for target_product_id
+		_id_target = None
+		while True:
+			sTarget = request_text( 'Target product (+q) : ', default = '' )
+			if not(sTarget) or (sTarget.strip().upper()=='+Q') :
+				return None
+			if sTarget.isdigit():
+				_p  = self.cachedphelper.products.product_from_id( int(sTarget) )
+				if _p:
+					_id_target = int( sTarget )
+					break
+			else:
+				self.do_list_product( [sTarget] )
+
+		_p  = self.cachedphelper.products.product_from_id( _id_target )
+		# Go printing!
+		self.output.writeln( "Target product   : %s (%s)" % (_p.reference, _p.id) )
+		_label_qty = request_int ( "# Label          ? " )
+		if not(_label_qty) or (_label_qty==0):
+			print( "User abord this transformation!" )
+			return
+		_trf = batch.add_transformation()
+		_trf.target_product_id   = _p.id
+		_trf.target_product_reference = _p.reference
+		_trf.target_product_name = _p.name
+		_trf.target_product_ean  = _p.ean13
+		_trf.creation_date       = datetime.datetime.now()
+		_trf.expiration          = batch.data.expiration
+		_trf.label_count         = _label_qty
+		return _trf
+
+	def do_batch_transform( self, params ):
+		""" Reload an existing batch and start a transformation """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an batch ID'
+		_id = int( params[0] )
+		_batch = self.batches.load_batch( _id )
+
+		self.output.writeln( "-"*40 )
+		self.output.writeln( "PREPARE TRANSFORMATION for %s (%s) " % (_batch.data.product_reference, _batch.data.product_id) )
+		self.output.writeln( "-"*40 )
+		# List the related product
+		self.show_combinations( int(_batch.data.product_id) )
+		# Encode a transformation
+		_trf = self.encode_batch_transformation( _batch )
+		if not( _trf ):
+			self.output.writeln( "User abord" )
+
+		self.batches.save_batch( _batch )
+		self.output.writeln( "Batch %i updated!" % _batch.data.batch_id )
+
+		print_ticket_transformation( _batch.data.batch_id , _trf, qty=_trf.label_count )
+		self.output.writeln( "" )
+
+	def do_batch_print( self, params ):
+		""" reload an existing batch and print it. """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an batch ID'
+		_id = int( params[0] )
+		_batch = self.batches.load_batch( _id )
+		print_ticket_batch( _batch, _batch.data.label_count )
+
+	def do_batch_list( self, params ):
+		""" List the last 25 batches (or params'Nth batches) from the disk """
+		if len( params )>0:
+			assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an integer'
+			count = int(params[0])
+		else:
+			count = 25
+
+		batch_id = self.batches.last_batch_id()
+		self.output.writeln( "List %s batches from #batch %s" % (count, batch_id) )
+		self.output.writeln( "%-10s : %-4s: %-36s : %-10s : %s" % ('Date', 'Batch', 'Product', 'Prod.ID', "Expire") )
+		self.output.writeln( "-"*70 )
+		while (count > 0) and (batch_id >= 0) :
+			try:
+				_batch = self.batches.load_batch( batch_id )
+			except EBatch as err:
+				# Loading error are just reported to the output
+				self.output.writeln( u"%s" % err ) # must be unicode
+				continue
+			finally:
+				count -= 1
+				batch_id -= 1
+			# Print batch information (date, batch, Product, Prod.ID, Expire )
+			self.output.writeln( "%10s : %4s : %3s x %-30s : %10s : %s" % (_batch.data.creation_date.strftime("%d/%m/%Y"), _batch.data.batch_id, _batch.data.label_count ,_batch.data.product_reference, _batch.data.product_id, _batch.data.expiration  ) )
+		self.output.writeln( "" )
 
 	def do_check_stock_config( self, params ):
 		""" Check all the product with improper stock configuration. """
@@ -1058,6 +1302,27 @@ class App( BaseApp ):
 		self.output.writeln( 'PARAMS id_supplier : %i' % self.ID_SUPPLIER_PARAMS )
 		self.output.writeln( 'list of option     :' )
 		self.do_show_option( params=[], prefix='      ')
+
+	def show_combinations( self, id ):
+		""" TOOL:
+		    Try to list down the various combination from a given ID_product (or ID_Combination)
+			If the id is a combination_id, the code extract the ID_product and list down the combinations """
+
+		assert type(id) is int, 'ID must be integer'
+
+		# extract ID_product from combination
+		if is_combination( id ):
+			id = unmangle_id_product( id )[0]
+
+		_ids = self.cachedphelper.products.product_combinations( id )
+		if len(_ids)==0:
+			self.output.writeln( 'No combinations for product ID %s' % id )
+			return
+		self.output.writeln( "%i combinations for product %s!" % (len(_ids),id) )
+		for id_combination in _ids:
+			_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( id_combination )
+			_qty = _sa.quantity if _sa else None
+			self.output.writeln( '  %10s : %-30s : %s' % (id_combination,self.cachedphelper.products.product_from_id(id_combination).reference,_qty) )
 
 	def do_show_product( self, params ):
 		""" Display the details about a given product ID (int).

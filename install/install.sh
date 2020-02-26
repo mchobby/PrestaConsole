@@ -11,6 +11,8 @@ pip install --user setuptools
 pip install --user httplib2
 pip install --user prestapyt
 pip install --user pyserial
+pip install --user filelock
+pip install --user configparser
 cd  ~
 mkdir python
 cd python

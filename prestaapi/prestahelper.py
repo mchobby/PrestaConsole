@@ -1691,7 +1691,7 @@ class StockAvailableList( BaseDataList ):
 	def load_from_xml( self, node ):
 		""" Load the stock available list with data comming from prestashop search.
 			Must contains nodes: id, id_product, ... """
-		save_to_file( 'StockAvailableList.load_from_xml', node)
+		#save_to_file( 'StockAvailableList.load_from_xml', node)
 		items = etree_to_dict( node )
 		items = items['prestashop']['stock_availables']['stock_available']
 		for item in items:
@@ -1769,7 +1769,7 @@ class CombinationList( BaseDataList ):
 	""" List of product combination """
 
 	def load_from_xml( self, node ):
-		save_to_file('CombinationList.load_from_xml', node) # Debug
+		#save_to_file('CombinationList.load_from_xml', node) # Debug
 		items = etree_to_dict( node )
 		#print( items )
 		items = items['prestashop']['combinations']['combination']
@@ -1873,7 +1873,7 @@ class BaseProductList( BaseDataList ):
 
 		# empty the list previously loaded
 		self.inactivelist = []
-		save_to_file( "BaseProductList.load_from_xml", node )
+		#save_to_file( "BaseProductList.load_from_xml", node )
 		items = etree_to_dict( node )
 		#print( items )
 		items = items['prestashop']['products']['product']
