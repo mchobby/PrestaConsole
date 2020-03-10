@@ -355,6 +355,8 @@ KEYWORDS = {
 	'batch print' : ['pbatch'],
 	'batch transform' : ['tbatch'],
 	'batch list' : ['lbatch'],
+	'batch view' : ['vbatch'],
+	'batch search' : ['sbatch'],
 	None       : ['from'] # remove any from and to
 
 }
@@ -376,6 +378,8 @@ COMMANDS = [
 	('batch print'    , 1   ),
 	('batch transform', 1   ),
 	('batch list'     , '*' ),
+	('batch view'     , 1   ),
+	('batch search'   , '+' ),
 	('check stock config',0 ),
 	('editor begin'   , 0   ),
 	('editor end'     , 0   ),
@@ -946,6 +950,43 @@ class App( BaseApp ):
 			finally:
 				count -= 1
 				batch_id -= 1
+			# Print batch information (date, batch, Product, Prod.ID, Expire )
+			self.output.writeln( "%10s : %4s : %3s x %-30s : %10s : %s" % (_batch.data.creation_date.strftime("%d/%m/%Y"), _batch.data.batch_id, _batch.data.label_count ,_batch.data.product_reference, _batch.data.product_id, _batch.data.expiration  ) )
+		self.output.writeln( "" )
+
+	def do_batch_view( self, params ):
+		""" View the content of the given batch """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the batch_id must be an integer'
+		batch_id = int(params[0])
+
+		for line in self.batches.as_text( batch_id ):
+			self.output.writeln( line )
+
+	def do_batch_search( self, params ):
+		""" Search in the batch for a string (given in parameter). The second parameter is the the search length"""
+		assert len(params)>0 and isinstance( params[0], str )
+		if len(params)>1:
+			assert isinstance( params[1], str ) and params[1].isdigit(), 'the second parameter must be an integer'
+			_count = int( params[1] )
+		else:
+			_count = 100
+
+		_last_id = self.batches.last_batch_id()
+		_text = params[0] # The search string
+
+		self.output.writeln( 'Search for "%s" from batch %i' % (_text,_last_id) )
+		_ids = self.batches.has_text( _last_id, _count, _text )
+
+		# Display the result list
+		self.output.writeln( "%-10s : %-4s: %-36s : %-10s : %s" % ('Date', 'Batch', 'Product', 'Prod.ID', "Expire") )
+		self.output.writeln( "-"*70 )
+		for _id in _ids :
+			try:
+				_batch = self.batches.load_batch( _id )
+			except EBatch as err:
+				# Loading error are just reported to the output
+				self.output.writeln( u"%s" % err ) # must be unicode
+				continue
 			# Print batch information (date, batch, Product, Prod.ID, Expire )
 			self.output.writeln( "%10s : %4s : %3s x %-30s : %10s : %s" % (_batch.data.creation_date.strftime("%d/%m/%Y"), _batch.data.batch_id, _batch.data.label_count ,_batch.data.product_reference, _batch.data.product_id, _batch.data.expiration  ) )
 		self.output.writeln( "" )

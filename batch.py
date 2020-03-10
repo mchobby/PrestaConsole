@@ -36,7 +36,7 @@ LOCK_FILE   = 'batches.lock'
 
 class EBatch( Exception ):
 	pass
-	
+
 class BatchData( object ):
 	def __init__( self ):
 		self.batch_id   = None
@@ -158,6 +158,17 @@ class Batch( object ):
 				trf = self.add_transformation()
 				trf.load_from_section( section_name, config )
 
+	def as_text( self, storage_path, batch_id ):
+		r = []
+		storage_sub_path = self.sub_path_for_batch( batch_id )
+		filename = os.path.join( storage_path, storage_sub_path, str(batch_id) )
+		if not os.path.exists( filename ):
+			raise EBatch( "Batch %s does not exists" % batch_id )
+		with codecs.open( filename, 'rb', encoding='utf-8' ) as _file:
+			_lines = _file.readlines()
+			for _line in _lines:
+				r.append( _line.encode('utf8','replace').replace('\r','').replace('\n',''))
+		return r
 
 class BatchFactory( object ):
 	def __init__( self, storage_path ):
@@ -186,6 +197,33 @@ class BatchFactory( object ):
 		_batch = Batch()
 		_batch.load( self.storage_path, batch_id  )
 		return _batch
+
+	def as_text( self, batch_id ):
+		""" returns the content of a batch as readable text """
+		_batch = Batch()
+		return _batch.as_text( self.storage_path, batch_id  )
+
+	def has_text( self, start_batch_id, max_count, _text ):
+		""" Search for a given string _text (not case-sensitive ) from start_batch down to start_batch-max_count.
+
+		Returns a list of batch_id """
+		_r = []
+		_text = _text.upper().replace('-','')
+		for _batch_id in range( start_batch_id, start_batch_id - max_count, -1 ):
+
+			if _batch_id < 0: # Going to far? then stop
+				break
+			# Load the batch
+			try:
+				_lines = self.as_text( _batch_id )
+				if any( [ _text in _line.upper().replace('-','') for _line in _lines ] ):
+					_r.append( _batch_id )
+					continue # process nex file
+			except EBatch as err:
+				pass # silent error
+				#print( '[ERROR] %s' % (_batch_id,err) )
+		return _r
+
 
 	def next_batch_id( self ):
 		with self.lock:
