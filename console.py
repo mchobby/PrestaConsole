@@ -209,6 +209,12 @@ class BaseApp( object ):
 		if len( sCmd.strip() )==0:
 			return( None, [] ) # Unable to decode
 
+		# Starting with = for evaluate a Python line
+		if sCmd.startswith('='):
+			self.output.writeln( "%s" % eval(sCmd[1:]) )
+			# Now returns Nothing to execute (everything is already done)
+			return ( NOPE, [] )
+
 		# Handle a PIPED command
 		if ( '|' in sCmd ):
 			sConsoleCmd = sCmd[:sCmd.index('|')]
