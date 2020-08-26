@@ -168,7 +168,7 @@ def build_inventory_list( cachedphelper ):
 	# Also locates all the IT-xxx articles.
 	# They are NOT ACTIVE so we would not duplicate them
 	for item in products.inactivelist:
-		if item.reference.find( 'IT-' ) == 0:
+		if item.reference and (item.reference.find( 'IT-' ) == 0):
 			_cargo = Product_cargo( item )
 			# Identify stock information
 			stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
