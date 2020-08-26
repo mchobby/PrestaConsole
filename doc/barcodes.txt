@@ -20,4 +20,6 @@ EAN13                     Description
 															1004 : Pick-up
 324<id_order>#            Order barcode
 325<id_warranty>#         Warranty Nr Barcode
+3261<id_batch>#           Batch Number (n° de lot)
+3262<id_expiration>#      Expiration date encoded with 00<mm><yyyy>
 33<id_combination>#       id_combination is composed of id_declination_value*1000+id_product

@@ -1,29 +1,29 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-"""tote-bag.py
+"""inventory.py
 
 derivated from prestaconsole.py project
-  
+
 Copyright 2018 DMeurisse <info@mchobby.be>
-  
-Prepare a shopping basket (or Tote Bag) for several manipulation
+
+Generate an inventory report for the shop
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
 (at your option) any later version.
-  
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-  
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 MA 02110-1301, USA.
-"""  
+"""
 
 from prestaapi import PrestaHelper, CachedPrestaHelper
 from prestaapi.prestahelpertest import run_prestahelper_tests
@@ -38,12 +38,12 @@ import xml.etree.cElementTree as etree
 
 from Tkinter import *
 import Tkinter, Tkconstants, tkFileDialog
- 
+
 PRODUCT_EXCLUDE = ( 'BON-CADEAU', 'X-CTU', 'POINT' )
 
 # from pypcl import calculate_ean13, ZplDocument, PrinterCupsAdapter
 
-RE_COMMAND                 = "^\+([a-zA-Z])$"              # (command) +r OU +s 
+RE_COMMAND                 = "^\+([a-zA-Z])$"              # (command) +r OU +s
 
 re_command       = re.compile( RE_COMMAND )
 
@@ -56,7 +56,7 @@ signal.signal(signal.SIGINT, catch_ctrl_C)
 #PRINTER_ENCODING = 'cp850'
 
 config = Config()
-logging.basicConfig( filename=config.logfile, level=logging.DEBUG, 
+logging.basicConfig( filename=config.logfile, level=logging.DEBUG,
 	format='%(asctime)s - [%(levelname)s] %(message)s',
 	datefmt='%d/%m/%y %H:%M:%S.%f' )
 
@@ -70,7 +70,7 @@ def list_products( cachedphelper, key ):
 	if len( key ) < 3:
 		print( 'searching product requires at least 3 characters' )
 		return
-	
+
 	result = cachedphelper.products.search_products_from_partialref( key, include_inactives = True )
 	for item in result:
 		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
@@ -94,7 +94,7 @@ class Product_cargo():
 def list_product( cachedphelper, id ):
 	""" Search for a product base on its ID + list it """
 	assert isinstance( id, int ), 'in must be a int'
-	
+
 	item = cachedphelper.products.product_from_id( id_product = id  )
 	if item:
 		print( '%7i : %s - %s' % (item.id,item.reference.ljust(30),item.name) )
@@ -106,7 +106,7 @@ def export_to_xmltree( lst , decimal_separator=',' ):
 		el = etree.SubElement( root, "product" )
 
         # __slots__ = ["id", "active", "reference", "name", "wholesale_price",
-        #     "price", "id_supplier", "id_category_default", "advanced_stock_management", 
+        #     "price", "id_supplier", "id_category_default", "advanced_stock_management",
         #     "available_for_order", "ean13" ]
 
 		# add values for the Row
@@ -114,31 +114,31 @@ def export_to_xmltree( lst , decimal_separator=',' ):
 		etree.SubElement( el, "reference" ).text = "%s" % item.reference
 		etree.SubElement( el, "PA_HTVA"   ).text = ("%s" % item.pa).replace('.', decimal_separator)
 		etree.SubElement( el, "PV_HTVA"   ).text = ("%s" % item.pv).replace('.', decimal_separator)
-		etree.SubElement( el, "qty_stock" ).text = "%s" % item.qty_stock	
+		etree.SubElement( el, "qty_stock" ).text = "%s" % item.qty_stock
 		etree.SubElement( el, "Valeur_PA" ).text = ("%s" % (item.pa*item.qty_stock)).replace('.', decimal_separator)
-		etree.SubElement( el, "Remarque"  ).text = ""	 
+		etree.SubElement( el, "Remarque"  ).text = ""
 		etree.SubElement( el, "Nom"       ).text = "%s" % item.name
-	
+
 	return root
 
 def get_product_params_dic( cachedpHelper,id_product ):
 	""" Locate the product parameter stored in the PARAMS supplier
 	    reference on the product. The reference is coded as follow
 	    param1:value1,param2:value2 """
-	
+
 	# If this special PARAMS supplier is not yet identified then
 	#   not possible to locate the special product parameter
-	#   stored there 
+	#   stored there
 	if ID_SUPPLIER_PARAMS == None:
 		return {}
-	
+
 	reference = ''
-	try:	
+	try:
 		reference = cachedpHelper.product_suppliers.reference_for( id_product, ID_SUPPLIER_PARAMS )
 		# print( 'reference: %s' % reference )
 		if len(reference )==0:
 			return {}
-		
+
 		result = {}
 		lst = reference.split(',')
 		for item in lst:
@@ -146,11 +146,11 @@ def get_product_params_dic( cachedpHelper,id_product ):
 			if len( vals )!= 2:
 				raise Exception( 'a parameter must have 2 parts!' )
 			result[vals[0]] = vals[1]
-		
+
 		return result
-		
+
 	except Exception as e:
-		print( 'Error while processing param %s with message %s ' % (reference,str(e)) )	
+		print( 'Error while processing param %s with message %s ' % (reference,str(e)) )
 		return {}
 
 def build_inventory_list( cachedphelper ):
@@ -166,7 +166,7 @@ def build_inventory_list( cachedphelper ):
 			_cargo.qty_stock = stock.quantity
 		r.append( _cargo )
 	# Also locates all the IT-xxx articles.
-	# They are NOT ACTIVE so we would not duplicate them 
+	# They are NOT ACTIVE so we would not duplicate them
 	for item in products.inactivelist:
 		if item.reference.find( 'IT-' ) == 0:
 			_cargo = Product_cargo( item )
@@ -174,14 +174,14 @@ def build_inventory_list( cachedphelper ):
 			stock = cachedphelper.stock_availables.stockavailable_from_id_product( _cargo.id )
 			if stock:
 				_cargo.qty_stock = stock.quantity
-			r.append( _cargo )			
+			r.append( _cargo )
 	return r
 
 def help():
-	""" Display Help """		
+	""" Display Help """
 	print( '== HELP %s' % ('='*34) )
 	print( '  +r : reload cache           | +s          : save cache' )
-	print( '  +e : export inventory       | ' )    
+	print( '  +e : export inventory       | ' )
 	print( '  +q : quit ' )
 	print( '='*40 )
 
@@ -200,13 +200,13 @@ def main():
 		#	print( '%i - %s' % (_item.id,_item.name) )
 		if _item != None:
 			ID_SUPPLIER_PARAMS = _item.id
-			print( 'Catched PARAMS supplier :-). ID: %i' % ID_SUPPLIER_PARAMS )	
-    
-    # A CachedPrestaHelper is a PrestaHelper with cache capabilities	
+			print( 'Catched PARAMS supplier :-). ID: %i' % ID_SUPPLIER_PARAMS )
+
+    # A CachedPrestaHelper is a PrestaHelper with cache capabilities
 	cachedphelper = CachedPrestaHelper( config.presta_api_url, config.presta_api_key, debug = False, progressCallback = progressHandler )
 	# Force loading cache
 	#   cachedphelper.load_from_webshop()
-	
+
 	#tester = CachedPrestaHelperTest( cachedphelper )
 	#tester.test_cache()
 	print( '******************************************************************' )
@@ -221,19 +221,19 @@ def main():
 	print( '#stock availables = %i' % len( cachedphelper.stock_availables ) )
 	print( '#product suppliers available = %i' % len( cachedphelper.product_suppliers ) )
 	print( '******************************************************************' )
-	print( '' )		
+	print( '' )
 	initialize_globals()
 
 	#print('mise à jour des qty' )
 	#cachedphelper.stock_availables.update_quantities()
 	#print( 'Voila, c est fait' )
-	
+
 	value = ''
 	while value != '+q':
 		try:
 			value = raw_input( 'What to do: ' )
 
-			       
+
 			# -- COMMANDS ------------------------------------------
 			# +q, +s, +r
 			g = re_command.match( value )
@@ -264,19 +264,19 @@ def main():
 					tree.write( root.filename )
 					root.destroy()
 					print( 'exported to %s' % root.filename )
-					
 
-				if cmd == 'h': 
+
+				if cmd == 'h':
 					help()
 
 				# restart loop
 				continue
 
 			# -- SEARCH -------------------------------------------
-			# GSM,  /-LIPO,    
+			# GSM,  /-LIPO,
 			#g = re_search_text.match( value )
 			#if g:
-			#	# Text to search = groups()[0] if "demo" or groups()[1] if "/-lipo"  
+			#	# Text to search = groups()[0] if "demo" or groups()[1] if "/-lipo"
 			#	txt = g.groups()[0] if g.groups()[0] else g.groups()[1]
 			#	list_products( cachedphelper, key = txt )
 			#	continue
@@ -290,4 +290,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-

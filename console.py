@@ -406,7 +406,7 @@ COMMANDS = [
 	('list order'     , '*' ),
 	('list product'   , '+' ),
 	('list supplier'  , '*' ),
-	('order'          , 1   ),
+	('order'          , '+'  ),
 	('print once'     , 0   ),
 	('print begin'    , 0   ),
 	('print end'      , 0   ),
@@ -462,10 +462,17 @@ class App( BaseApp ):
 	def __init_from_loaded_data( self ):
 		""" Initialize special parameters the loaded webshop data (file of WebShop) """
 		self.ID_SUPPLIER_PARAMS = None
+		self.ID_SUPPLIER_TARIFF = None
 
 		_item = self.cachedphelper.suppliers.supplier_from_name( "PARAMS" )
 		if _item != None:
 			self.ID_SUPPLIER_PARAMS = _item.id
+
+		_item = self.cachedphelper.suppliers.supplier_from_name( "TARIFF-CODE" )
+		if _item != None:
+			self.ID_SUPPLIER_TARIFF = _item.id
+		print( 'ID_SUPPLIER_PARAMS : %s' % self.ID_SUPPLIER_PARAMS )
+		print( 'ID_SUPPLIER_TARIFF : %s' % self.ID_SUPPLIER_TARIFF )
 
 	def get_product_params( self, id_product ):
 		""" Locate the product parameter stored in the PARAMS supplier reference for that product.
@@ -491,6 +498,27 @@ class App( BaseApp ):
 			result[vals[0]] = vals[1]
 
 		return result
+
+	def get_product_tariff( self, id_product ):
+		""" Locate the Tariff Code for the product stored into the TARIFF supplier reference for that product.
+			The PARAMS supplier is encoded as follows: country_ISO,tariff """
+		assert type(id_product) is int, "is_product must be interger"
+		# If this special TARIFF supplier is not yet identified then
+		#   not possible to locate the special product parameter
+		#   stored there
+		if self.ID_SUPPLIER_TARIFF == None:
+			return (None,None)
+
+		tariff = self.cachedphelper.product_suppliers.reference_for( id_product, self.ID_SUPPLIER_TARIFF )
+		# print( 'id_product %s -> tariff: %s' % (type(id_product),tariff) )
+		if len(tariff)==0:
+			return (None,None)
+
+		lst = tariff.split(',')
+		if len( lst )!= 2:
+			raise Exception( 'Invalid product TARIFF "%s" for id_product %s. it must have 2 parts (country,tariff)' % (tariff, id_product) )
+
+		return (lst[0],lst[1]) # Country ISO Code, tariff_code
 
 	def get_qm_info( self, psr ):
 		""" generate the 'Quantity Minimum Warning' message for a given product.
@@ -1018,6 +1046,9 @@ class App( BaseApp ):
 		""" Load and Show the detail of a given order """
 		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID cmd'
 		_id = int( params[0] )
+		_option = "" # Additional keywork as TARIFF
+		if len(params)>1:
+			_option = params[1].upper().strip()
 
 		orders = self.cachedphelper.get_last_orders( _id, 1 )
 		if len( orders ) <= 0:
@@ -1026,25 +1057,66 @@ class App( BaseApp ):
 		order = orders[0]
 		customer = self.cachedphelper.get_customer( order.id_customer )
 
-		self.output.writeln( '--- Order ID : %i ---' % order.id )
-		self.output.writeln( 'Shop ID      : %s' % order.id_shop )
-		# print( 'Carrier   ID : %i' % order.id_carrier )
-		# print( 'current state: %i' % order.current_state )
-		# print( 'Customer  ID : %i' % order.id_customer )
-		self.output.writeln( 'Customer     : %s' % customer.customer_name )
-		self.output.writeln( 'Cust.EMail   : %s' % customer.email )
-		self.output.writeln( 'Carrier      : %s' % self.cachedphelper.carriers.carrier_from_id( order.id_carrier ).name )
-		self.output.writeln( 'Order Date   : %s' % order.date_add )
-		self.output.writeln( 'Current State: %s @ %s' % ( self.cachedphelper.order_states.order_state_from_id( order.current_state ).name, order.date_upd) )
-		self.output.writeln( 'valid        : %i' % order.valid )
-		self.output.writeln( 'payment      : %s' % order.payment )
-		self.output.writeln( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
-		self.output.writeln( 'total Paid   : %.2f' % order.total_paid )
-		self.output.writeln( 'Shipping Nr  : %s'   % order.shipping_number )
-		self.output.writeln( '' )
-		# Content the order
-		for row in order.rows:
-			self.output.writeln( row )
+		def display_order():
+			self.output.writeln( '--- Order ID : %i ---' % order.id )
+			self.output.writeln( 'Shop ID      : %s' % order.id_shop )
+			# print( 'Carrier   ID : %i' % order.id_carrier )
+			# print( 'current state: %i' % order.current_state )
+			# print( 'Customer  ID : %i' % order.id_customer )
+			self.output.writeln( 'Customer     : %s' % customer.customer_name )
+			self.output.writeln( 'Cust.EMail   : %s' % customer.email )
+			self.output.writeln( 'Carrier      : %s' % self.cachedphelper.carriers.carrier_from_id( order.id_carrier ).name )
+			self.output.writeln( 'Order Date   : %s' % order.date_add )
+			self.output.writeln( 'Current State: %s @ %s' % ( self.cachedphelper.order_states.order_state_from_id( order.current_state ).name, order.date_upd) )
+			self.output.writeln( 'valid        : %i' % order.valid )
+			self.output.writeln( 'payment      : %s' % order.payment )
+			self.output.writeln( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
+			self.output.writeln( 'total Paid   : %.2f' % order.total_paid )
+			self.output.writeln( 'Shipping Nr  : %s'   % order.shipping_number )
+			self.output.writeln( '' )
+			# Content the order
+			for row in order.rows:
+				self.output.writeln( row )
+
+		def display_tariff():
+			# qty, ref, country, tariff, total weight,  Unit_price Ex.VAT, total_price Ex.VAT
+			sTitle  = "%3s | %-30s | %5s | %20s | %s | %10s | %10s"
+			sFormat = "%3i | %-30s | %5s | %20s | %6.3f | %10.2f | %10.2f"
+
+			self.output.writeln( '              Tariff Declaration' )
+			self.output.writeln( '              ==================' )
+			self.output.writeln( '' )
+			self.output.writeln( 'Date         : %-20s  | Order #: %s' % (order.date_add,order.id) )
+			self.output.writeln( 'Shipper Name : MCHobby SRPL          |  Consignee : %s' % (customer.customer_name) )
+			self.output.writeln( 'Address      :                       |  Address   :' )
+			self.output.writeln( '  Clos de la Giberne, 3              |' )
+			self.output.writeln( '  1410 Waterloo                      |' )
+			self.output.writeln( '  Belgium                            |' )
+			self.output.writeln( '  TAX ID: BE0538.615.264             |' )
+			self.output.writeln( 'Contact : +32.496.92.83.20           | Contact : %s ' % (customer.email ) )
+			self.output.writeln( '' )
+			self.output.writeln( 'Exporting Carrier: %s' % self.cachedphelper.carriers.carrier_from_id( order.id_carrier ).name )
+			self.output.writeln( 'Total Ex.VAT     : %.2f EUR' % order.total_paid_tax_excl )
+			self.output.writeln( '' )
+			self.output.writeln( '   *** all prices are EUR Ex.VAT ***' )
+			self.output.writeln( '' )
+			self.output.writeln( sTitle  % ('Qty', 'Reference / label', 'Orig.', 'Tariff Code', 'Weight', 'U.Price', 'Total Price'))
+			self.output.writeln( '-'*100)
+
+			for row in order.rows:
+				# import pdb; pdb.set_trace()
+				# qty, ref, country, tariff, total weight,  Unit_price Ex.VAT, total_price Ex.VAT
+				id_product = int(row.id_product)
+				t = self.get_product_tariff( id_product ) # ( Country_iso, Tariff )
+				p = self.cachedphelper.products.product_from_id( id_product, include_inactives=True )
+				self.output.writeln( sFormat % (row.ordered_qty, row.reference, t[0], t[1], 0, row.unit_price, row.ordered_qty * row.unit_price) )
+
+		if _option == "":
+			display_order()
+		elif _option == "TARIFF":
+			display_tariff()
+		else:
+			raise Exception("Invalid option %s for order command" % _option )
 
 	def do_ean( self, params ):
 		""" Generates the EAN13 for the ID_Product """
