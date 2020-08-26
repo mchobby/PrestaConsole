@@ -235,6 +235,37 @@ def handle_print_vat_label_large():
 
 	print_custom_label_large( title, lines, qty )
 
+def handle_print_esd_label_large():
+	""" Ask the user for qty and print Electro Static Discharge labels """
+	title = 'Conformite testee' # Title cannot be unicode
+	lines = []
+	lines.append( u"Cet article a ete controle"  )
+	lines.append( u"par MC Hobby SPRL"  )
+
+	# print_custom_label_king( "/!\\  DECHARGES  /!\\", "ELECTROSTATIQUES", qty=1 )
+	# Decode the line otherwise the unicode quest an ascii string
+
+	qty = request_qty()
+	if qty == None:
+		return
+
+	for i in range( qty ):
+		print_custom_label_large( title, lines, qty=1 )
+		print_custom_label_king( "!!!  DECHARGES  !!!" , "ELECTROSTATIQUES", qty=1 )
+
+
+def handle_print_conformity_label_small():
+	""" Ask user for quantity then print the conformity labels """
+		# Decode the line otherwise the unicode quest an ascii string
+	title = 'CONFORMITE TESTEE' # Title cannot be unicode
+	lines = [ u'Cet article a ete controle', u'par MC Hobby SPRL' ]
+
+	qty = request_qty()
+	if qty == None:
+		return
+
+	print_custom_label_small( title, lines, qty )
+
 def handle_print_ean_label_large():
 	""" Ask the user for the data to print a CUSTOM ean label for large format """
 	title = raw_input( 'Title (sans accent) or +q: ' )

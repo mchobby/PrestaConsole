@@ -55,7 +55,8 @@ except Exception as err:
 
 
 from labelprn import handle_print_for_product, print_custom_label_small, handle_print_custom_label_large, handle_print_custom_label_small, handle_print_custom_label_king, \
-		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large, ean12_to_ean13
+		handle_print_warranty_label_large, handle_print_vat_label_large, handle_print_ean_label_large, ean12_to_ean13, handle_print_conformity_label_small, \
+		handle_print_esd_label_large
 from labelprn import printer_shortlabel_queue_name, printer_largelabel_queue_name , printer_ticket_queue_name
 from labelprn import print_ticket_batch, print_ticket_transformation
 
@@ -400,6 +401,8 @@ COMMANDS = [
 	('label king'     , 0   ),
 	('label war'      , 1   ),
 	('label vat'      , 0   ),
+	('label conf'     , 0   ),
+	('label esd'      , 0   ),
 	('label ean'      , 0   ),
 	('label order'    , 1   ),
 	('links'          , 1   ),
@@ -1213,6 +1216,12 @@ class App( BaseApp ):
 
 	def do_label_vat( self, params ):
 		handle_print_vat_label_large()
+
+	def do_label_conf( self, params ):
+		handle_print_conformity_label_small()
+
+	def do_label_esd( self, params ):
+		handle_print_esd_label_large()
 
 	def do_label_ean( self, params ):
 		handle_print_ean_label_large()

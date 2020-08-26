@@ -179,6 +179,14 @@ label order <ID> :
   Print a label with order-id EAN barcode
 	<ID> must be the #order
 
+label conf :
+    Print "Conformite Testee" labels.
+
+
+label esd :
+    print "Electrostatic discharge" + "Conformite testee" labels
+
+
 label vat :
 
     Print Intracommunautary labels.
