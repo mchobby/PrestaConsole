@@ -387,9 +387,9 @@ class OrderShipApp():
 						self.beep()
 						continue
 					self.output.writeln("")
-					self.output.writeln("ORDER CHECK SUCCESSFULLY")
-					self.output.writeln("")
-					self.output.writeln( 'OPERATION DATE : %s' % datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") )
+					self.output.writeln("ORDER ID %i CHECK SUCCESSFULLY" % self.order.id )
+					self.output.writeln("CUSTOMER       : %s" % self.customer.customer_name )
+					self.output.writeln("OPERATION DATE : %s" % datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S") )
 					# Save the scan file.
 					_path, _filename = self.order_filename(self.order)
 					self.output.save_carbon_copy( os.path.join( _path, _filename ) )

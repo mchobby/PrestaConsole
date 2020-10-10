@@ -380,6 +380,11 @@ COMMANDS = [
 	('bag export'     , 0   ),
 	('bag import'     , 0   ),
 	('bag links'      , 0   ),
+	('bag quote'      , 0   ),
+	('bag rebate'     , 0   ),
+	('bag comment del', 0   ),
+	('bag comment'    , 0   ),
+	('bag ship'       , 0   ),
 	('bag'            , 0   ),
 	('batch new'      , 1   ),
 	('batch print'    , 1   ),
@@ -724,37 +729,40 @@ class App( BaseApp ):
 		print( "Printed" )
 
 
-	def test_save_order( self, _id ):
+	def save_shipping_nr( self, order_ids, shipping_nr ):
 		""" TEST: read, set status=Shipping, set Shipping_nr THEN save the order.
 			If configured proprely, this will also send the shipping mail.
 
-			:param _id: order id (EG. 14286) """
+			:param ids: list of order id (EG. [14286])
+			:param shipping_nr: bacode with the shipping number """
 
-		# Load an order
-		_data = self.cachedphelper.get_order_data( _id )
-		from xml.etree import ElementTree
-		# Change the Order Status
-		order = list( _data )[0]
-		order_properties = list( order )
-		order_current_state = [ order_property for order_property in order_properties if order_property.tag == 'current_state' ]
-		if order_current_state[0].text == str( OrderStateList.ORDER_STATE_SHIPPING ):
-			raise Exception( 'Order %s already in SHIPPING status' % _id )
-		# Update the status in XML Document
-		# <current_state xmlns:ns0="http://www.w3.org/1999/xlink" ns0:href="https://dev.mchobby.be/api/order_states/3">4</current_state>
-		order_current_state[0].text = str( OrderStateList.ORDER_STATE_SHIPPING )
-		order_current_state[0].set( '{http://www.w3.org/1999/xlink}href', 'https://dev.mchobby.be/api/order_states/%s'%OrderStateList.ORDER_STATE_SHIPPING )
-		# Update Shipping Number --> Simplier way
-		_el = _data.find('order').find('shipping_number')
-		_el.text = '444719'
+		for _id in order_ids:
+			# Load an order
+			_data = self.cachedphelper.get_order_data( _id )
+			from xml.etree import ElementTree
+			# Change the Order Status
+			order = list( _data )[0]
+			order_properties = list( order )
+			order_current_state = [ order_property for order_property in order_properties if order_property.tag == 'current_state' ]
+			if order_current_state[0].text == str( OrderStateList.ORDER_STATE_SHIPPING ):
+				raise Exception( 'Order %s already in SHIPPING status' % _id )
+			# Update the status in XML Document
+			# <current_state xmlns:ns0="http://www.w3.org/1999/xlink" ns0:href="https://dev.mchobby.be/api/order_states/3">4</current_state>
+			order_current_state[0].text = str( OrderStateList.ORDER_STATE_SHIPPING )
+			order_current_state[0].set( '{http://www.w3.org/1999/xlink}href', '%s/order_states/%s' % (self.config.presta_api_url,OrderStateList.ORDER_STATE_SHIPPING) )
+			# Update Shipping Number --> Simplier way
+			_el = _data.find('order').find('shipping_number')
+			_el.text = "%s" % shipping_nr # Ensure it is a string.
 
-		# Debugging
-		# print( ElementTree.tostring(_data) )
-		# import pdb; pdb.set_trace()
+			# Debugging
+			# print( ElementTree.tostring(_data) )
+			# import pdb; pdb.set_trace()
 
-		# Send the Data to PrestaShop. It will reread the data and return it
-		# (so the order) as an ElementTree
-		result = self.cachedphelper.post_order_data( _data )
-		# print( ElementTree.tostring(result) )
+			# Send the Data to PrestaShop. It will reread the data and return it
+			# (so the order) as an ElementTree
+			result = self.cachedphelper.post_order_data( _data )
+			self.output.writeln( 'Order %s updated to SHIPPING status' % _id )
+			# print( ElementTree.tostring(result) )
 
 	def test_order_history( self, _id ):
 		""" TEST: order history inspection """
@@ -781,19 +789,137 @@ class App( BaseApp ):
 		#_desc = False # Display in descending order
 
 		if len( self.bag )==0:
+			self.output.writeln( '' )
 			self.output.writeln(  '(empty bag)' )
 		else:
 			self.output_product_search_result( psr_list = self.bag )
-			totals = self.bag.total_price_ordered() # sum, sum_ttc, sum_wholesale_price
+			# show the comments
+			for comment in self.bag.comments:
+				_qty = ('%7i'%comment.qty) if comment.qty!=None else ''
+				_text = comment.text
+				_price = ('%6.2f' % comment.price) if comment.price!=None else ''
+				_price_ttc = ('%6.2f' % (comment.price*1.21)) if comment.price!=None else ''
+				self.output.writeln( '%7s |           | %-61s | %6s (%6s ) | ' % (_qty,_text,_price,_price_ttc))
+			# Prices
+			totals = self.bag.total_price_ordered() # sum, sum_ttc, sum_wholesale_price, rebate_htva
+			# Displays the comments
 			self.output.writeln( 'Total (TTC) : %6.2f Eur (%6.2f TTC)' % (totals[0], totals[1]) )
 			if totals[2]>0:
 				self.output.writeln( 'Marge       : %6.2f Eur (%4.2f %%)' % (totals[0]-totals[2], ((totals[0]-totals[2])/totals[2])*100) )
+			if self.bag.rebate > 0:
+				# totals[3] = rebate_htva
+				self.output.writeln( '+%s' % ('-'*40) )
+				self.output.writeln( '| Rebate      : %5.2f %%  (%6.2f EUR HTVA)' % (self.bag.rebate, totals[3]) )
+				self.output.writeln( '| Total (TTC) : %6.2f Eur (%6.2f TTC)' % (totals[0]-totals[3], (totals[0]-totals[3])*1.21) )
+				if totals[2]>0: # If wholesale price available
+					self.output.writeln( '| Marge revue : %6.2f Eur (%4.2f %%)' % (totals[0]-totals[2]-totals[3], ((totals[0]-totals[2]-totals[3])/totals[2])*100) )
+				self.output.writeln( '+%s' % ('-'*40) )
+			else:
+				self.output.writeln( 'Rebate      : NO')
 		#for idx, item in enumerate( reversed(self.bag) if _desc else self.bag ):
 		#	#if max_row and (idx>=max_row):
 		#	#	print( '> ...' ) # indicates the presence of more items in the bag
 		#	#	break;
 		#
 		#	print( '%3i x %7i : %s - %s' % (item.qty, item.product.id,item.product.reference.ljust(30),item.product.name) )
+
+	def do_bag_rebate( self, params ):
+		""" Set the rebate value """
+		value = ''
+		while True:
+			if value != None:
+				self.do_bag( params )
+
+			value = raw_input( "Rebate percent or +q: " )
+			if value == '+q':
+				break
+
+			try:
+				self.bag.rebate = float(value)
+			except:
+				print('Incorrect value!')
+				value = None # Do not redisplay bag at next round
+
+		return None
+
+	def do_bag_comment( self, params ):
+		""" Add a comment to the bag """
+		label = raw_input( "Label or +q: " )
+		if ( label == '+q' ) or ( len(label)==0 ):
+			return None
+		price = raw_input( "price or empty or +q: " )
+		if len(price)==0:
+			_price = None
+		elif price=='+q':
+			return None
+		else:
+			_price = float( price )
+
+		qty = raw_input( "qty or empty or +q: " )
+		if len(qty)==0:
+			_qty = 1
+		elif qty=='+q':
+			return None
+		else:
+			_qty = int( qty )
+
+		self.bag.add_comment( _qty, label, _price )
+		# Show the bag
+		self.do_bag( params )
+
+	def do_bag_comment_del( self, params ):
+		""" Remove a comment from bag """
+		if len( self.bag.comments )==0:
+			return None
+		for idx in range( len(self.bag.comments) ):
+			self.output.writeln( '%2i : %s' % (idx, self.bag.comments[idx].text ) )
+		value = raw_input( "Which to delete or +q: " )
+		if len(value)==0:
+			return None
+		elif value=='+q':
+			return None
+		else:
+			_idx = int( value )
+			del(self.bag.comments[_idx])
+
+	def do_bag_ship( self, params ):
+		""" Add a shipping cost to the bag (under the form of a comment)"""
+		_pricing = [ ('Poste BE (home)', 6.53), ('Colissimo FR (home)', 10.00),
+		             ('Relais BE', 4.00), ('Relais BE', 2.50),
+					 ('Relais FR', 6.00), ('Relais FR', 3.50),
+					 ('DHL BE', 16.00), ('DHL FR', 16.50) ]
+		for i in range( len(_pricing) ):
+			print( '%2i : %-20s ( %6.2f EUR)' % (i, _pricing[i][0], _pricing[i][1]) )
+
+		pricing  = 0.0
+		qty      = 1
+		shipping = raw_input( "Label or +q: " )
+		if ( shipping == '+q' ) or ( len(shipping)==0 ):
+			return None
+		elif shipping.isdigit():
+			pricing  = _pricing[int(shipping)][1]
+			shipping = _pricing[int(shipping)][0]
+
+		price = raw_input( "price (%6.2f) or +q: " % pricing )
+		if len(price)==0:
+			pass # Keep pricing
+		elif price=='+q':
+			return None # exits
+		else:
+			pricing = float( price )
+
+		value = raw_input( "qty (%i) or +q: " % qty )
+		if len(value)==0:
+			pass
+		elif value=='+q':
+			return None
+		else:
+			qty = int( value )
+
+		self.bag.add_comment( qty, shipping, pricing )
+		# Show the bag
+		self.do_bag( params )
+
 
 	def do_bag_clear( self, params ):
 		self.bag.clear()
@@ -841,6 +967,76 @@ class App( BaseApp ):
 			self.output.writeln( '   %8.2f Eur TTC/p (indicatif)' % (item.product.price*1.21) )
 			self.output.writeln( '   '+self.options['shop_url_product'].format( id=item.product.id )  )
 			self.output.writeln( ' ' )
+
+	def do_bag_quote( self, params ):
+		""" Export BAG as QUOTE text list + Link to the webshop """
+		dt = datetime.datetime.today()
+		self.output.writeln( '---------------------------------' )
+		self.output.writeln( '   DDD   EEEE  V   V  I   SSSS' )
+		self.output.writeln( '   D  D  E     V   V  I  S    ' )
+		self.output.writeln( '   D  D  EEE   V   V  I   SSS ' )
+		self.output.writeln( '   D  D  E      V V   I      S' )
+		self.output.writeln( '   DDD   EEEE    V    I  SSSS ' )
+		self.output.writeln( '---------------------------------' )
+		self.output.writeln( ' ' )
+		self.output.writeln( '                       Devis n°   : '  )
+		self.output.writeln( '                       Date       : %s' % dt.strftime("%d/%m/%Y") )
+		self.output.writeln( '                       Expiration : %s' % (dt+datetime.timedelta(days=30)).strftime("%d/%m/%Y") )
+		self.output.writeln( 'SHIPPING ADDRESS:' )
+		self.output.writeln( '   Company  : ' )
+		self.output.writeln( '   Recipient: ' )
+		self.output.writeln( '   Address  : ' )
+		self.output.writeln( '   CP/Town  : ' )
+		self.output.writeln( ' ' )
+		self.output.writeln( 'INVOICE ADDRESS:' )
+		self.output.writeln( '   Company  : ' )
+		self.output.writeln( '   Recipient: ' )
+		self.output.writeln( '   Address  : ' )
+		self.output.writeln( '   CP/Town  : ' )
+		self.output.writeln( '   VAT      : ' )
+		self.output.writeln( ' ' )
+		self.output.writeln( '-'*70 )
+		self.output.writeln( '%3s | %-30s | %8s |  %8s ' % ("Qty", "Description", "P.U.", "Total EUR (HTVA)" ) )
+		self.output.writeln( '-'*70 )
+		for item in self.bag:
+			self.output.writeln( '%3i | %-30s | %8.2f |  %8.2f ' % (item.qty, item.product.reference, item.product.price, item.qty * item.product.price ) )
+			self.output.writeln( '    | %s' % item.product.name )
+			self.output.writeln( '    | '+self.options['shop_url_product'].format( id=item.product.id )  )
+			self.output.writeln( '%3s | %30s | %8s |  %8s ' % ("", "", "", "" ) )
+			# self.output.writeln( ' ' )
+			# self.output.writeln( '   %8.2f Eur TTC/p (indicatif)' % (item.product.price*1.21) )
+		for comment in self.bag.comments:
+			_qty = ('%3i'%comment.qty) if comment.price!=None else ''
+			_text = comment.text
+			_price = ('%6.2f' % comment.price) if comment.price!=None else ''
+			_total = ('%6.2f' % (comment.price*comment.qty)) if comment.price!=None else ''
+			self.output.writeln( '%3s | %-30s | %8s |  %8s ' % (_qty,_text,_price,_total))
+
+		totals = self.bag.total_price_ordered() # sum, sum_ttc, sum_wholesale_price, rebate_htva
+		if self.bag.rebate > 0:
+			self.output.writeln( '%3i | %-30s | %8.2f |  %8.2f ' % (1, 'Rebate %5.2f EUR'%totals[3],-1*totals[3],-1*totals[3] ) )
+		self.output.writeln( '-'*70 )
+		self.output.writeln( 'Total HTVA: %8.2f EUR' % (totals[0]-totals[3]) ) # sum_htva - rebate_htva
+		_tva = (totals[0]-totals[3])*0.21
+		self.output.writeln( 'TVA       : %8.2f EUR' % _tva ) # amount of TVA
+		self.output.writeln( 'Total TTC : %8.2f EUR' % (totals[0]-totals[3]+_tva) )
+
+		self.output.writeln( ' ' )
+
+		self.output.writeln( 'Delivery delay   : [ On order confirmation depending on supplier stock ]' )
+		self.output.writeln( 'Payment          : [ 7 to 10 days max after delivery ] [ Payment at order ]' )
+		self.output.writeln( '                    BELGIUM' )
+		self.output.writeln( '                    BNP : Iban : BE 41 0017 0629 8910' )
+		self.output.writeln( '                          Swift: GEBABEBB' )
+		self.output.writeln( ' ' )
+		self.output.writeln( '-'*70 )
+		self.output.writeln( ' MC Hobby SPRL - Clos de la Giberne, 3 - 1410 WATERLOO - BELGIQUE' )
+		self.output.writeln( ' Email: frc@mchobby.be - www.MCHobby.be - tel: +32 (0) 496 92 83 20' )
+		self.output.writeln( ' BNP Parisbas : IBAN : BE41 0017 0629 8910 - BIC/SWIFT : GEBABEBB' )
+		self.output.writeln( ' TVA : BE 0538.615.264 RPM Nivelles' )
+
+
+
 
 	def do_batch_new( self, params ):
 		""" Create a new batch with expiration information """
@@ -1114,10 +1310,23 @@ class App( BaseApp ):
 				p = self.cachedphelper.products.product_from_id( id_product, include_inactives=True )
 				self.output.writeln( sFormat % (row.ordered_qty, row.reference, t[0], t[1], 0, row.unit_price, row.ordered_qty * row.unit_price) )
 
+		def update_order_send():
+			self.output.writeln( '--- Order ID : %i ---' % order.id )
+			self.output.writeln( 'Updating shipping info...' )
+			_data = "" # Additional data is shipping Nr
+			if len(params)>2:
+				_data = params[2].upper().strip()
+			if _data == "":
+				raise Exception.create("Shipping number is missing!")
+			# This command receive an unique order_id as int, _data=shiping_nr
+			self.save_shipping_nr( [_id], _data )
+
 		if _option == "":
 			display_order()
 		elif _option == "TARIFF":
 			display_tariff()
+		elif _option == "SEND":
+			update_order_send()
 		else:
 			raise Exception("Invalid option %s for order command" % _option )
 

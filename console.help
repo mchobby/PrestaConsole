@@ -88,14 +88,33 @@ bag clear :
 
   Clear the bag (shppoing basket)
 
+bag rebate :
+
+	key-in a rebate for the bag.
+
+bag ship :
+
+	key-in a shipping method.
+
+bag comment :
+
+		Add a comment (possibly with price and quantity) to bag
+
+bag comment del :
+
+		list and delete a given comment from bag
+
 bag links :
 
   export the bag content as TEXT list + link to webshop
 
+bag quote :
+
+	draw a quotation (devis) from the bag.
+
 bag export :
 
   Export the bag as XML file ready to import in LibreOffice calc.
-
 
 bag import :
 
@@ -228,7 +247,7 @@ list supplier <PARAM> order :
   column can be displayed with the option "show-product-qm".
 
 
-order <ID> <option=''>:
+order <ID> <option=''> <data=''>:
 
   Show the details of a given order (who, when, what, status, etc).
   A list of recent order can be retreived with "list order"
@@ -236,7 +255,9 @@ order <ID> <option=''>:
 	<option> = '' : just print the content of customer order.
 	<option> = 'tariff' : print a tariff listing for the order (Tariff listing
 	                     is used for international shipping custom declaration).
-
+  <option> = 'send' : set the order as send.
+	                    <data> must be initialized with the tracking number.
+											EG: order 18888 send 444719
 
 print once :
 

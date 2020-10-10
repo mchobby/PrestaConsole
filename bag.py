@@ -34,12 +34,46 @@ re_add_remove_several_id = re.compile( RE_ADD_REMOVE_SEVERAL_ID )
 re_add_remove_several_text = re.compile( RE_ADD_REMOVE_SEVERAL_TEXT )
 re_add_remove_ID = re.compile( RE_ADD_REMOVE_ID )
 
+class BagComment:
+	def __init__(self, text, price=None, qty=1 ):
+		self.text = text
+		self.qty = qty
+		self.price = price # Price HTVA
+
+class BagCommentList( list ):
+	def clear( self ):
+		""" Clear all the items in the list """
+		del( self[:] )
+
+	def add_comment( self, text, price=None, qty=1 ):
+		""" Add a comment with possibly a price HTVA """
+		_item = BagComment(text,price, qty)
+		self.append( _item )
+		return _item
+
+	def total_price( self ):
+		""" Total price (without VAT) of the comment items.
+
+		returns a sum_without_tax """
+		sum_netto = 0
+		for item in self:
+			if item.price:
+				sum_netto += (item.qty * item.price)
+
+		return sum_netto
+
 class ToteBag( list ):
 	""" A Tote Bag is a Basket """
+	def __init__( self ):
+		list.__init__(self)
+		self._rebate = 0
+		self.comments = BagCommentList()
 
 	def clear( self ):
 		""" Clear all the items in the list """
 		del( self[:] )
+		self.comments.clear()
+		self._rebate = 0
 
 	def get_tote_item( self, product ):
 		""" Retreive an article from the tote_bag if it exists inside """
@@ -47,6 +81,10 @@ class ToteBag( list ):
 			if _item.product.id == product.id:
 				return _item # return a ToteItem
 		return None
+
+	def add_comment( self, qty, label, price ):
+		""" Add a comment to the bag, possibly with price and quantity """
+		item = self.comments.add_comment( label, price, qty ) # Price may be None when not applying
 
 	def add_product( self, qty, product ):
 		""" Add the given quantity of an article to bag and return the tote_item.
@@ -136,7 +174,7 @@ class ToteBag( list ):
 	def total_price_ordered( self ):
 		""" Total price (without VAT) of the ordered stuff in the basket.
 
-		return a tuple (sum_without_tax, sum_tax_included, sum_wholesale_price ) """
+		return a tuple (sum_without_tax, sum_tax_included, sum_wholesale_price, rebate_without_tax ) """
 		sum_netto = 0
 		sum_ttc   = 0
 		sum_wholesale = 0
@@ -146,8 +184,29 @@ class ToteBag( list ):
 				sum_netto += tote_item.qty * tote_item.product.price
 				sum_ttc   += tote_item.qty * tote_item.product.price_ttc
 				sum_wholesale += tote_item.qty * tote_item.product.wholesale_price
+		# Add Priced comment to total
+		#     also add it to sum_wholesale to not perturb margin calculation
+		for comment in self.comments:
+			_qty = 0 if comment.qty==None else comment.qty
+			_price = 0 if comment.price==None else comment.price
+			if (_qty==0) or (_price==0):
+				continue
+			sum_netto += _qty * _price
+			sum_ttc   += _qty * (_price*1.21)
+			sum_wholesale += _qty * _price # Include price in Wholesale to not influence the margin calculation
 
-		return (sum_netto, sum_ttc, sum_wholesale)
+		rebate_htva = sum_netto * self._rebate / 100
+		return (sum_netto, sum_ttc, sum_wholesale, rebate_htva )
+
+	@property
+	def rebate( self ):
+		""" Rebate in percent from 0.0 to 100 """
+		return self._rebate
+
+	@rebate.setter
+	def rebate( self, value ):
+		assert 0 <= value <= 100, "Rebate between 0.0 to 100"
+		self._rebate = value
 
 	def export_to_xmltree( self, decimal_separator=',' ):
 		""" Export the content of a Tote Bag into an XML structure """
