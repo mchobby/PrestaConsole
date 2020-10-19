@@ -194,7 +194,7 @@ class BatchFactory( object ):
 
 	def batch_filename(self, batch_id ):
 		""" Returns the full path for a given batch """
-		return os.path.join( self.storage_path, str(batch_id) )
+		return os.path.join( self.storage_path, "%05i" % (batch_id // 100), str(batch_id) )
 
 	def load_batch( self, batch_id ):
 		""" Load the Batch object from disk """
