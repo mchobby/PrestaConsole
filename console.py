@@ -46,6 +46,7 @@ from batch import BatchFactory, EBatch
 import cmd
 import sys
 import re
+import subprocess
 
 try:
 	from Tkinter import *
@@ -213,6 +214,12 @@ class BaseApp( object ):
 		# Starting with = for evaluate a Python line
 		if sCmd.startswith('='):
 			self.output.writeln( "%s" % eval(sCmd[1:]) )
+			# Now returns Nothing to execute (everything is already done)
+			return ( NOPE, [] )
+
+		# Start with ! to execute a basch command
+		if sCmd.startswith('!'):
+			os.system( sCmd[sCmd.index('!'):] )
 			# Now returns Nothing to execute (everything is already done)
 			return ( NOPE, [] )
 
@@ -1191,7 +1198,7 @@ class App( BaseApp ):
 		""" View the content of the given batch """
 		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the batch_id must be an integer'
 		batch_id = int(params[0])
-
+		self.output.writeln( 'stored @ %s' % self.batches.batch_filename(batch_id) )
 		for line in self.batches.as_text( batch_id ):
 			self.output.writeln( line )
 
