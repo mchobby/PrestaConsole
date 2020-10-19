@@ -27,6 +27,7 @@ Key-in a .<ID> would ne translate to the command "show product <ID>"
 Key-in a ./<Supplier_ref> would try to resolve the supplier ref before "show product <ID>"
 Key-in a .*<label_text> would try to resolve the text before "show product <ID>"
 Key-in a =<Expression> would return the results of the expression (eg: =1.25*3)
+Key-in a !<bash_command> would execute the bash command 
 
 It also exist bag manipulation commands
 	* add/remove IDs       with +3*125 or -4*1024
@@ -119,6 +120,36 @@ bag export :
 bag import :
 
   Reimport the XML file into the bag.
+
+
+batch new <ID>:
+  alias: nbatch
+  Create a new batch for the given product.
+
+
+batch print <ID_BATCH> :
+  alias: pbatch
+  Print the labels of an existing batch
+
+
+batch transform <ID_BATCH> :
+  alias: tbatch
+  Open an existing batch ID, retrieve the article and declination,
+  propose to select an additional article + quantity to register the
+  transformation one product (1Kg sweet) to sub-product (5x 200gr sweet).
+
+batch list <COUNT=25>:
+  alias: lbatch
+  List the last created batch.
+
+batch view <ID_BATCH> :
+  alias: vbatch
+  List the content of a batch as stored onto the file server
+
+batch search <KEY> <COUNT=100> :
+  alias: sbatch
+  Scan the COUNT last batches and search for the KEY string (case insensitive).
+  Return a list of matching batches.
 
 
 check stock config :
