@@ -219,7 +219,7 @@ class BaseApp( object ):
 
 		# Start with ! to execute a basch command
 		if sCmd.startswith('!'):
-			os.system( sCmd[sCmd.index('!'):] )
+			os.system( sCmd[sCmd.index('!')+1:] )
 			# Now returns Nothing to execute (everything is already done)
 			return ( NOPE, [] )
 
