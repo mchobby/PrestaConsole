@@ -986,9 +986,10 @@ class App( BaseApp ):
 		self.output.writeln( '   DDD   EEEE    V    I  SSSS ' )
 		self.output.writeln( '---------------------------------' )
 		self.output.writeln( ' ' )
-		self.output.writeln( '                       Devis n°   : '  )
+		self.output.writeln( '                       Quote nr   : '  )
 		self.output.writeln( '                       Date       : %s' % dt.strftime("%d/%m/%Y") )
 		self.output.writeln( '                       Expiration : %s' % (dt+datetime.timedelta(days=30)).strftime("%d/%m/%Y") )
+		self.output.writeln( '                       Your Ref   : ' )
 		self.output.writeln( 'SHIPPING ADDRESS:' )
 		self.output.writeln( '   Company  : ' )
 		self.output.writeln( '   Recipient: ' )
@@ -1000,13 +1001,13 @@ class App( BaseApp ):
 		self.output.writeln( '   Recipient: ' )
 		self.output.writeln( '   Address  : ' )
 		self.output.writeln( '   CP/Town  : ' )
-		self.output.writeln( '   VAT      : ' )
+		self.output.writeln( '   VAT      : *** specify if applicable *** ' )
 		self.output.writeln( ' ' )
 		self.output.writeln( '-'*70 )
 		self.output.writeln( '%3s | %-30s | %8s |  %8s ' % ("Qty", "Description", "P.U.", "Total EUR (HTVA)" ) )
 		self.output.writeln( '-'*70 )
 		for item in self.bag:
-			self.output.writeln( '%3i | %-30s | %8.2f |  %8.2f ' % (item.qty, item.product.reference, item.product.price, item.qty * item.product.price ) )
+			self.output.writeln( '%3i | %-30s | %8.2f |         %8.2f EUR' % (item.qty, item.product.reference, item.product.price, item.qty * item.product.price ) )
 			self.output.writeln( '    | %s' % item.product.name )
 			self.output.writeln( '    | '+self.options['shop_url_product'].format( id=item.product.id )  )
 			self.output.writeln( '%3s | %30s | %8s |  %8s ' % ("", "", "", "" ) )
@@ -1021,20 +1022,22 @@ class App( BaseApp ):
 
 		totals = self.bag.total_price_ordered() # sum, sum_ttc, sum_wholesale_price, rebate_htva
 		if self.bag.rebate > 0:
-			self.output.writeln( '%3i | %-30s | %8.2f |  %8.2f ' % (1, 'Rebate %5.2f EUR'%totals[3],-1*totals[3],-1*totals[3] ) )
+			self.output.writeln( '%3i | %-30s | %8.2f |             %8.2f ' % (1, 'Rebate %5.2f EUR'%totals[3],-1*totals[3],-1*totals[3] ) )
 		self.output.writeln( '-'*70 )
-		self.output.writeln( 'Total HTVA: %8.2f EUR' % (totals[0]-totals[3]) ) # sum_htva - rebate_htva
+		self.output.writeln( '                                              Total HTVA: %8.2f EUR' % (totals[0]-totals[3]) ) # sum_htva - rebate_htva
 		_tva = (totals[0]-totals[3])*0.21
-		self.output.writeln( 'TVA       : %8.2f EUR' % _tva ) # amount of TVA
-		self.output.writeln( 'Total TTC : %8.2f EUR' % (totals[0]-totals[3]+_tva) )
-
+		self.output.writeln( '                                              TVA       : %8.2f EUR' % _tva ) # amount of TVA
+		self.output.writeln( '                                              Total TTC : %8.2f EUR' % (totals[0]-totals[3]+_tva) )
 		self.output.writeln( ' ' )
 
 		self.output.writeln( 'Delivery delay   : [ On order confirmation depending on supplier stock ]' )
 		self.output.writeln( 'Payment          : [ 7 to 10 days max after delivery ] [ Payment at order ]' )
-		self.output.writeln( '                    BELGIUM' )
-		self.output.writeln( '                    BNP : Iban : BE 41 0017 0629 8910' )
+		self.output.writeln( '                    BELGIUM - BNP Paris Bas' )
+		self.output.writeln( '                          IBAN : BE 41 0017 0629 8910' )
 		self.output.writeln( '                          Swift: GEBABEBB' )
+		self.output.writeln( '                    FRANCE - CIC' )
+		self.output.writeln( '                          IBAN : FR76 3002 7175 3300 0201 1860 138' )
+		self.output.writeln( '                          Swift: CMCIFRPP' )
 		self.output.writeln( ' ' )
 		self.output.writeln( '-'*70 )
 		self.output.writeln( ' MC Hobby SPRL - Clos de la Giberne, 3 - 1410 WATERLOO - BELGIQUE' )
