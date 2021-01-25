@@ -223,6 +223,7 @@ def main():
 	print( '******************************************************************' )
 	print( '' )
 	initialize_globals()
+	help()
 
 	#print('mise à jour des qty' )
 	#cachedphelper.stock_availables.update_quantities()
