@@ -7,7 +7,6 @@ console.sh
 cachefile.pkl
 logfile.log
 pushgit.sh
-order-ship-mail.py
 
 lcdmtrx
 test

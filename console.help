@@ -27,7 +27,9 @@ Key-in a .<ID> would ne translate to the command "show product <ID>"
 Key-in a ./<Supplier_ref> would try to resolve the supplier ref before "show product <ID>"
 Key-in a .*<label_text> would try to resolve the text before "show product <ID>"
 Key-in a =<Expression> would return the results of the expression (eg: =1.25*3)
-Key-in a !<bash_command> would execute the bash command 
+Key-in a !<bash_command> would execute the bash command
+Key-in a <console_command> | <bash_command> would execute a bash_command (eg: grep) over the result of a console_command
+key-in a <console_command> || <filter_text> will filters the console_command result to retain lines having the filter_text (NOT CASE-SENSITIVE).
 
 It also exist bag manipulation commands
 	* add/remove IDs       with +3*125 or -4*1024

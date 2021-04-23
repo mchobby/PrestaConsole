@@ -235,7 +235,7 @@ class PrestaHelper(object):
 		""" retreive a list of products from PrestaShop """
 		# combinations are used to create the various "declinaisons" of a single product
 		logging.debug( 'read combinations' )
-		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price]' } )
+		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price,weight]' } )
 		_combinations = CombinationList( self )
 		#save_to_file( 'get_products_combinations', el )
 		_combinations.load_from_xml( el )
@@ -244,7 +244,7 @@ class PrestaHelper(object):
 		#el = self.__prestashop.search( 'products' )
 		#print( ElementTree.tostring( el ) )
 
-		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13]'} )
+		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,weight]'} )
 		#print( ElementTree.tostring( el ) )
 
 		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
@@ -536,7 +536,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 5
+	CACHE_FILE_VERSION = 6
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -710,7 +710,10 @@ class CachedPrestaHelper( PrestaHelper ):
 			_p = self.__product_list.product_from_id( product_supplier.id_product )
 			if _p:
 				psr=ProductSearchResult( _p )
+				# Append only the supplier REF
 				psr.product_suppliers.append( product_supplier )
+				# Add also ALL supplier refs for the product (to get TariffCode & QM,QO)
+				psr.add_product_suppliers( self.__product_supplier_list.suppliers_for_id_product( product_supplier.id_product ) )
 				_result.append( psr )
 		self.__update_search_product_qty( _result )
 		return _result
@@ -1584,10 +1587,11 @@ class ProductData( BaseData ):
 		advanced_stock_management(int) - 1/0 for advanced stock management
 		available_for_order(int)       - 1/0
 		ean13(str)	           - ean13 value when available
+		weight(float) - Product weight in Kg
 
 	Remarks: directly loaded from by the product list class """
 
-	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13" ]
+	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "weight" ]
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an product """
@@ -1595,7 +1599,7 @@ class ProductData( BaseData ):
 
 	def __getstate__(self):
 		""" Return the object state for pickeling """
-		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13 }
+		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight }
 
 	def __setstate__(self, dic):
 		""" Set the object state from unpickeling """
@@ -1613,6 +1617,7 @@ class ProductData( BaseData ):
 			self.ean13				  = dic['ean13']
 		else:
 			self.ean13				  = ''
+		self.weight					  = dic['weight']
 
 	def canonical_reference( self ):
 		""" Return the canonical search string of the reference.
@@ -1869,6 +1874,7 @@ class BaseProductList( BaseDataList ):
 			else:
 				self.append( _data )
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
+			_data.weight = float(item['weight'])
 			return _data
 
 		# empty the list previously loaded

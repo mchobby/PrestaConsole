@@ -223,8 +223,36 @@ class BaseApp( object ):
 			# Now returns Nothing to execute (everything is already done)
 			return ( NOPE, [] )
 
-		# Handle a PIPED command
-		if ( '|' in sCmd ):
+		if ( '||' in sCmd ): # Handle DOUBLE PIPE (Filter)
+			sConsoleCmd = sCmd[:sCmd.index('||')]
+			sFilter     = sCmd[sCmd.index('||')+2:]
+			sFilter     = sFilter.strip().upper()
+			old_stdout_active = self.output.stdout_active
+
+			if not self.cachedphelper.debug :
+				self.output.stdout_active = False
+			self.output.set_carbon_copy( activate=True )
+			try:
+				# Execute -> write to carbon_copy
+				self.evaluate_line( sConsoleCmd )
+				iCmdLines = len(self.output.carbon_copy)
+				# Filtering the Carbon copy
+				sl = []
+				for line in self.output.carbon_copy:
+					if sFilter in line.upper():
+						sl.append( line )
+			finally:
+				self.output.stdout_active = old_stdout_active
+				self.output.set_carbon_copy( activate=False )
+			# print out results
+			self.output.write_lines( sl )
+			self.output.writeln( '%s row for %s' %(iCmdLines,sConsoleCmd) )
+			self.output.writeln( '%s row in result' % len(sl) )
+			# Now returns Nothing to execute (everything is already done)
+			return ( NOPE, [] )
+
+
+		elif ( '|' in sCmd ): # Handle a PIPED command (send to linux command)
 			sConsoleCmd = sCmd[:sCmd.index('|')]
 			sPipeCmd    = sCmd[sCmd.index('|'):]
 			old_stdout_active = self.output.stdout_active
@@ -516,24 +544,25 @@ class App( BaseApp ):
 
 	def get_product_tariff( self, id_product ):
 		""" Locate the Tariff Code for the product stored into the TARIFF supplier reference for that product.
-			The PARAMS supplier is encoded as follows: country_ISO,tariff """
+			The PARAMS supplier is encoded as follows: country_ISO,tariff,weight """
 		assert type(id_product) is int, "is_product must be interger"
 		# If this special TARIFF supplier is not yet identified then
 		#   not possible to locate the special product parameter
 		#   stored there
 		if self.ID_SUPPLIER_TARIFF == None:
-			return (None,None)
+			return (None,None,None)
 
 		tariff = self.cachedphelper.product_suppliers.reference_for( id_product, self.ID_SUPPLIER_TARIFF )
+		product = self.cachedphelper.products.product_from_id( id_product )
 		# print( 'id_product %s -> tariff: %s' % (type(id_product),tariff) )
 		if len(tariff)==0:
-			return (None,None)
+			return (None,None,None)
 
 		lst = tariff.split(',')
 		if len( lst )!= 2:
 			raise Exception( 'Invalid product TARIFF "%s" for id_product %s. it must have 2 parts (country,tariff)' % (tariff, id_product) )
 
-		return (lst[0],lst[1]) # Country ISO Code, tariff_code
+		return (lst[0],lst[1],product.weight) # Country ISO Code, tariff_code
 
 	def get_qm_info( self, psr ):
 		""" generate the 'Quantity Minimum Warning' message for a given product.
@@ -1289,7 +1318,7 @@ class App( BaseApp ):
 
 		def display_tariff():
 			# qty, ref, country, tariff, total weight,  Unit_price Ex.VAT, total_price Ex.VAT
-			sTitle  = "%3s | %-30s | %5s | %20s | %s | %10s | %10s"
+			sTitle  = "%3s | %-30s | %5s | %20s | %6s | %10s | %10s"
 			sFormat = "%3i | %-30s | %5s | %20s | %6.3f | %10.2f | %10.2f"
 
 			self.output.writeln( '              Tariff Declaration' )
@@ -1309,16 +1338,16 @@ class App( BaseApp ):
 			self.output.writeln( '' )
 			self.output.writeln( '   *** all prices are EUR Ex.VAT ***' )
 			self.output.writeln( '' )
-			self.output.writeln( sTitle  % ('Qty', 'Reference / label', 'Orig.', 'Tariff Code', 'Weight', 'U.Price', 'Total Price'))
+			self.output.writeln( sTitle  % ('Qty', 'Reference / label', 'Orig.', 'Tariff Code', 'U.Kg', 'U.Price', 'Total Price'))
 			self.output.writeln( '-'*100)
 
 			for row in order.rows:
 				# import pdb; pdb.set_trace()
 				# qty, ref, country, tariff, total weight,  Unit_price Ex.VAT, total_price Ex.VAT
 				id_product = int(row.id_product)
-				t = self.get_product_tariff( id_product ) # ( Country_iso, Tariff )
+				t = self.get_product_tariff( id_product ) # ( Country_iso, Tariff, Weight )
 				p = self.cachedphelper.products.product_from_id( id_product, include_inactives=True )
-				self.output.writeln( sFormat % (row.ordered_qty, row.reference, t[0], t[1], 0, row.unit_price, row.ordered_qty * row.unit_price) )
+				self.output.writeln( sFormat % (row.ordered_qty, row.reference, t[0], t[1], t[2], row.unit_price, row.ordered_qty * row.unit_price) )
 
 		def update_order_send():
 			self.output.writeln( '--- Order ID : %i ---' % order.id )
@@ -1755,6 +1784,7 @@ class App( BaseApp ):
 		# PARAMS
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )
+		self.output.writeln( 'Weight     : %6.3f Kg' % p.weight )
 
 		# Supplier Ref
 		_supp_ref = -1

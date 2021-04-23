@@ -47,6 +47,9 @@ CONFIG_KEY_EXPORT_PATH = 'export_path'
 
 # Order-Ship
 CONFIG_KEY_DATA_PATH = 'data_path'
+CONFIG_KEY_MAIL_API = 'mail_api'
+CONFIG_KEY_MAIL_API_KEY = 'mail_api_key'
+CONFIG_KEY_MAIL_API_SECRET = 'mail_api_secret'
 
 class Config(object):
 	"""read paramters from the "config.ini" configuration file"""
@@ -65,6 +68,9 @@ class Config(object):
 	_tote_bag_export_path = ''
 
 	_order_ship_data_path = ''
+	_order_ship_mail_api = None
+	_order_ship_mail_api_key = None
+	_order_ship_mail_api_secret = None
 
 	def __init__( self ):
 		config = ConfigParser()
@@ -122,8 +128,14 @@ class Config(object):
 		except:
 			pass
 
+		self._order_ship_api = None
+		self._order_ship_api_key = None
+		self._order_ship_api_secret = None
 		try:
 			self._order_ship_data_path = config.get( CONFIG_SECTION_ORDER_SHIP, CONFIG_KEY_DATA_PATH )
+			self._order_ship_api = config.get( CONFIG_SECTION_ORDER_SHIP, CONFIG_KEY_MAIL_API )
+			self._order_ship_api_key = config.get( CONFIG_SECTION_ORDER_SHIP, CONFIG_KEY_MAIL_API_KEY )
+			self._order_ship_api_secret = config.get( CONFIG_SECTION_ORDER_SHIP, CONFIG_KEY_MAIL_API_SECRET )
 		except:
 			pass
 
@@ -213,3 +225,18 @@ class Config(object):
 	@property
 	def order_ship_data_path( self ):
 		return self._order_ship_data_path
+
+	@property
+	def order_ship_api( self ):
+		assert self._order_ship_api
+		return self._order_ship_api
+
+	@property
+	def order_ship_api_key( self ):
+		assert self._order_ship_api_key
+		return self._order_ship_api_key
+
+	@property
+	def order_ship_api_secret( self ):
+		assert self._order_ship_api_secret
+		return self._order_ship_api_secret
