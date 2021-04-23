@@ -117,6 +117,13 @@ class Batch( object ):
 		self.transformations.append( _r )
 		return _r
 
+	def has_transformation( self, id_product ):
+		# Check if the batch contains transformation for the target product_ID
+		for t in self.transformations:
+			if int(t.target_product_id) == int(id_product):
+				return True
+		return False
+
 
 	def sub_path_for_batch( self, batch_id ):
 		""" Compute the storage sub-path for a given batch id. 100 files by sub-directory
