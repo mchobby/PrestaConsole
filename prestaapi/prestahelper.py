@@ -914,6 +914,9 @@ class OrderRowData( BaseData ):
 
 		self.id = _extract(dic,"id")
 		self.id_product = _extract(dic,"product_id")
+		# Is this a Combination product ?
+		if ("OrderRowData" in dic) and (item['id_product_attribute'] != '0'):
+			self.id_product = recompute_id_product( self.id_product, int(item['id_product_attribute']['#text']))
 		self.ordered_qty = int( _extract(dic,"product_quantity") )
 		self.reference   = _extract(dic,"product_reference")
 		self.unit_price_ttc = float( _extract(dic,"unit_price_tax_incl") ) # TTC
