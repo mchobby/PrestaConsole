@@ -9,7 +9,7 @@ Copyright 2014 MC Hobby SPRL, All right reserved
 """
 
 from prestapyt import PrestaShopWebServiceError, PrestaShopWebService
-from xml.etree import ElementTree
+from xml.etree import ElementTree # --> print( ElementTree.tostring( el ) )
 from collections import defaultdict
 from pprint import pprint
 import logging
@@ -343,7 +343,7 @@ class PrestaHelper(object):
 		try:
 			for i in range( count ): #  range(1)=0 range(2)=0,1
 				el = self.__prestashop.get( 'orders', fromId-i )
-				print( ElementTree.tostring( el ) )
+				# print( ElementTree.tostring( el ) )
 				order = OrderData( self )
 				order.load_from_xml( el )
 				_result.append( order )
@@ -915,8 +915,8 @@ class OrderRowData( BaseData ):
 		self.id = _extract(dic,"id")
 		self.id_product = _extract(dic,"product_id")
 		# Is this a Combination product ?
-		if ("OrderRowData" in dic) and (item['id_product_attribute'] != '0'):
-			self.id_product = recompute_id_product( self.id_product, int(item['id_product_attribute']['#text']))
+		if ("product_attribute_id" in dic) and (dic['product_attribute_id'] != '0'):
+			self.id_product = recompute_id_product( int(self.id_product), int(dic['product_attribute_id']))
 		self.ordered_qty = int( _extract(dic,"product_quantity") )
 		self.reference   = _extract(dic,"product_reference")
 		self.unit_price_ttc = float( _extract(dic,"unit_price_tax_incl") ) # TTC
