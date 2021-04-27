@@ -61,7 +61,7 @@ class EanType( Enum ):
 
 def ean_type( ean ):
 	""" Try to figure out which is the type of ean enclosed within the EAN string """
-	if ean.startswith("32321") or ean.startswidth("33"):
+	if ean.startswith("32321") or ean.startswith("33"):
 		return EanType.PRODUCT
 	elif ean.startswith("324"):
 		return EanType.ORDER
