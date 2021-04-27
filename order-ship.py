@@ -61,7 +61,7 @@ class EanType( Enum ):
 
 def ean_type( ean ):
 	""" Try to figure out which is the type of ean enclosed within the EAN string """
-	if ean.startswith("32321") or ean.startswith("33"): 
+	if ean.startswith("32321") or ean.startswith("33"): # Product or Product with combination
 		return EanType.PRODUCT
 	elif ean.startswith("324"):
 		return EanType.ORDER
@@ -436,7 +436,7 @@ print( 'Shop ID      : %s' % order.id_shop )
 # print( 'Customer  ID : %i' % order.id_customer )
 print( 'Customer     : %s' % customer.customer_name )
 print( 'Cust.EMail   : %s' % customer.email )
-print( 'Carrier      : %s' % h.carriers.carrier_from_id( order.id_carrier ).name )
+print( 'Carrier      : %s' % h.carriers.name_from_id( order.id_carrier ) )
 print( 'Current State: %s' % h.order_states.order_state_from_id( order.current_state ).name )
 print( 'valid        : %i' % order.valid )
 print( 'payment      : %s' % order.payment )

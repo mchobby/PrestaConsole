@@ -343,6 +343,7 @@ class PrestaHelper(object):
 		try:
 			for i in range( count ): #  range(1)=0 range(2)=0,1
 				el = self.__prestashop.get( 'orders', fromId-i )
+				print( ElementTree.tostring( el ) )
 				order = OrderData( self )
 				order.load_from_xml( el )
 				_result.append( order )
