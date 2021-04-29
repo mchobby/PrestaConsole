@@ -431,6 +431,7 @@ COMMANDS = [
 	('batch load'     , 1   ),
 	('batch search'   , '+' ),
 	('check stock config',0 ),
+	('check ean config' , 0 ),
 	('editor begin'   , 0   ),
 	('editor end'     , 0   ),
 	('editor once'    , 0   ),
@@ -1416,6 +1417,35 @@ class App( BaseApp ):
 		sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
 		self.output.writeln( 'Products with improper stock configuration' )
 		self.output_product_search_result( psr_list = sorted_lst )
+
+	def do_check_ean_config( self, params ):
+		""" Check all the product with improper ean code. """
+		psr_lst = ProductSearchResultList()
+		for _p in self.cachedphelper.products:
+			if _p.active == 0:
+				continue
+
+			if len(_p.ean13)>0:
+				_ean = _p.ean13[:12]
+				try:
+					calc_ean = calculate_ean13( _ean )
+				except:
+					# calculation may raise error in case of incorrect _ean base (eg:0)
+					calc_ean = '-1' # will
+
+				# If EAN match the Recalculated EAN --> do not register it in
+				# the list of error
+				if calc_ean == _p.ean13:
+					continue
+
+			_psr = ProductSearchResult( _p )
+			_psr.add_product_suppliers( self.cachedphelper.product_suppliers.suppliers_for_id_product( _p.id ) )
+			_psr.quantity = -999
+			psr_lst.append( _psr )
+		sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
+		self.output.writeln( 'Products with improper ean configuration' )
+		self.output_product_search_result( psr_list = sorted_lst )
+
 
 	def do_order( self, params ):
 		""" Load and Show the detail of a given order """

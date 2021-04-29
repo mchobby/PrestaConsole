@@ -156,7 +156,7 @@ class OrderShipApp():
 			# decode the CARRIER barre code
 			_cmd_type = CMD.SET_CARRIER
 			_cmd_data = CARRIERS[v] # Convert ean to CARRIER name
-		elif _ean_type == EanType.PRODUCT:
+		elif (_ean_type == EanType.PRODUCT) or (_ean_type == EanType.UNDEFINED ): # May also be a product EAN... so give it a try
 			# Retreive the product ID from EAN
 			_lst = self.h.products.search_products_for_ean( v )
 			if len(_lst)==0:

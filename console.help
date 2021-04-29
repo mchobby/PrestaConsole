@@ -160,6 +160,12 @@ check stock config :
   Product allowing ORDER_OUT_OF_STOCK or product with
   stock not DEPENDS_ON_STOCK_SYNCH will be listed.
 
+check ean config :
+
+  List all the product with incorrect EAN value.
+	The ean is read from the product recalculated and compared again with
+	the product ean. If it doesn't match then the product is listed down
+	in the output result. 
 
 ean <ID> :
 
