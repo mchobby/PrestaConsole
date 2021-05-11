@@ -1916,25 +1916,32 @@ class App( BaseApp ):
 		# So we need to be sure to obtain a base product in any case
 		print( 'id : %s ' % _id )
 		print( 'product data:' )
-		print( p.advanced_stock_management )
 		if is_combination( _id):
 			print( "base product: %s" % unmangle_id_product(_id)[0] )
 			p_base = self.cachedphelper.products.product_from_id( unmangle_id_product(_id)[0] ) # find the base product from the combination product
 			print( p_base )
 		else:
-			print( "not a combination for %s" %_id)
+			print( "no combination for %s" %_id)
 			p_base = p # The product is already a base product
-
+		# Taux de Marge / Marging rate
 		try:
 			_margin = (p.price-p.wholesale_price) / p.wholesale_price * 100
 		except:
 			_margin = -1
+		# Taux de marque / Brand rating
+		try:
+
+			_marque = (p.price-p.wholesale_price) / p.price * 100
+		except:
+			_marque = -1
+
 		self.output.writeln( 'Reference  : %s' % p.reference )
 		self.output.writeln( 'Name       : %s' % p.name )
 		self.output.writeln( 'EAN        : %s' % p.ean13 )
 		self.output.writeln( 'ID         : %s  (%s)' % (p.id, 'active' if p.active==1 else 'INACTIVE') )
-		self.output.writeln( 'P.A. (%%)   : %6.2f (%4.1f %%)' %  (p.wholesale_price,_margin) )
-		self.output.writeln( 'P.V. (TTC) : %6.2f (%6.2f)' % ( p.price, p.price_ttc ) )
+		self.output.writeln( 'P.A. (%%)   : %6.2f (%4.1f %% MARGIN rate)' %  (p.wholesale_price,_margin) )
+		self.output.writeln( 'P.V. (%%)   : %6.2f (%4.1f %% brand  rate)' %  (p.price, _marque ) )
+		self.output.writeln( 'P.V. TTC   : %6.2f' % ( p.price_ttc ) )
 		self.output.writeln( ' ' )
 		# If stock_available (only reloabale for basic product)
 		if _sa and not(is_combination(_id)):
