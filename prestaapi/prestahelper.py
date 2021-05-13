@@ -68,9 +68,15 @@ def extract_hashtext( item, default_lang_id='2' ):
 		# extract multilingual
 		for label_dic in item['language']:
 			if label_dic['@id'] == default_lang_id:
-				return label_dic['#text']
+				if '#text' in label_dic: # cover strange case: {'language': {'@id': '2'}
+					return label_dic['#text']
+				else:
+					return ''
 	else:
-		return item['language']['#text']
+		if '#text' in item['language']:
+			return item['language']['#text']
+		else:
+			return ''
 
 def ean13_checksum(ean_base):
 	"""Calculates the checksum for EAN13-Code.
@@ -221,6 +227,59 @@ class PrestaHelper(object):
 		customerthread.load_from_xml( el )
 		return customerthread
 
+	def get_countries( self ):
+		""" Retreive a list of Countries (CountryData) from prestashop """
+		logging.debug( 'read countries' )
+		el = self.__prestashop.search( 'countries', options = {'display':'[id,iso_code,active,name]'} )
+		_result = CountryList( self )
+		# save_to_file('countries', el )
+		_result.load_from_xml( el )
+		return _result
+
+	def get_taxes( self ):
+		logging.debug( 'read taxes' )
+		el = self.__prestashop.search( 'taxes', options = {'display':'[id,active,rate]'} )
+		_result = TaxList( self )
+		# save_to_file('taxes', el )
+		_result.load_from_xml( el )
+		return _result
+
+	def get_tax_rules( self ):
+		logging.debug( 'read tax rules' )
+		el = self.__prestashop.search( 'tax_rules', options = {'display':'[id,id_country,id_tax,id_tax_rules_group]'} )
+		_result = TaxRuleList( self )
+		# save_to_file('tax_rules', el )
+		_result.load_from_xml( el )
+		return _result
+
+	def get_tax_rule_groups( self ):
+		logging.debug( 'read tax rule groups' )
+		el = self.__prestashop.search( 'tax_rule_groups', options = {'display':'[id,active,name]'} )
+
+		_result = TaxRuleGroupList( self )
+		# save_to_file('tax_rule_groups', el )
+		_result.load_from_xml( el )
+		return _result
+
+	def get_tax_rate( self, id_tax_rule_group, country_iso ):
+		""" Products does not have Tax_id but Tax_Rule_Group + Country for which we do need it. """
+		# Optimize: if already search and found -> Return it qwickly
+
+		country = self.countries.country_from_iso_code( country_iso )
+		if country==None:
+			raise Exception('get_tax_rate: no country for iso_code=%s' % (country_iso) )
+		id_country = country.id
+
+		tax_rule_group = self.tax_rules.taxrule_for_country( id_tax_rule_group, id_country )
+		if tax_rule_group == None:
+			raise Exception('get_tax_rate: no tax_rule_group for id_tax_rule_group=%i, id_country=%i' % (id_tax_rule_group, id_country))
+		id_tax = tax_rule_group.id_tax
+
+		tax = self.taxes.tax_from_id( id_tax )
+		if tax == None:
+			raise Exception('get_tax_rate: no tax record for id_tax=%i' % (id_tax))
+		return tax.rate # 6.000 or 21.000 percent
+
 	def get_carriers( self ):
 		""" Retreive a list of Carriers (CarrierData) from prestashop """
 		logging.debug( 'read carriers' )
@@ -244,7 +303,7 @@ class PrestaHelper(object):
 		#el = self.__prestashop.search( 'products' )
 		#print( ElementTree.tostring( el ) )
 
-		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,weight]'} )
+		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,weight,id_tax_rules_group]'} )
 		#print( ElementTree.tostring( el ) )
 
 		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
@@ -537,11 +596,15 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 6
+	CACHE_FILE_VERSION = 7
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
 	__carrier_list = None
+	__country_list = None
+	__tax_list     = None
+	__tax_rule_list = None
+	__tax_rule_group_list = None
 	__order_state_list = None
 	__product_list = None
 	__supplier_list = None
@@ -569,7 +632,8 @@ class CachedPrestaHelper( PrestaHelper ):
 	def load_from_webshop( self ):
 		""" Load the cache with data cominf from the WebShop """
 		logging.info( 'Init cache from WebShop' )
-		__MAX_STEP = 7
+		__MAX_STEP = 11
+
 		self.fireProgress( 1, __MAX_STEP, 'Caching Carriers...' )
 		self.__carrier_list = self.get_carriers()
 		self.fireProgress( 2, __MAX_STEP, 'Caching Order states...' )
@@ -584,10 +648,18 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__stock_available_list = self.get_stockavailables()
 		self.fireProgress( 7, __MAX_STEP, 'Caching Product Suppliers...' )
 		self.__product_supplier_list = self.get_product_suppliers()
+		self.fireProgress( 8, __MAX_STEP, 'Caching Countries...' )
+		self.__country_list = self.get_countries()
+		self.fireProgress( 9, __MAX_STEP, 'Caching Taxes...' )
+		self.__tax_list = self.get_taxes()
+		self.fireProgress( 10, __MAX_STEP, 'Caching Tax Rules...' )
+		self.__tax_rule_list = self.get_tax_rules()
+		self.fireProgress( 11, __MAX_STEP, 'Caching Tax Rule Groups...' )
+		self.__tax_rule_group_list = self.get_tax_rule_groups()
+
 		# Languages are not pickled yet
 		# self.fireProgress( 8, __MAX_STEP, 'Caching languages...' )
 		# self.__language_list = self.get_languages()
-
 
 		# Closing progress
 		self.fireProgress( -1, __MAX_STEP, 'Done' ) # -1 for hidding
@@ -624,6 +696,15 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__stock_available_list.unpickle_data( fh )
 			self.__product_supplier_list = ProductSupplierList( self )
 			self.__product_supplier_list.unpickle_data( fh )
+			self.__country_list = CountryList( self )
+			self.__country_list.unpickle_data( fh )
+			self.__tax_list = TaxList( self )
+			self.__tax_list.unpickle_data( fh )
+			self.__tax_rule_list = TaxRuleList( self )
+			self.__tax_rule_list.unpickle_data( fh )
+			self.__tax_rule_group_list = TaxRuleList( self )
+			self.__tax_rule_group_list.unpickle_data( fh )
+
 			return True
 		except StandardError, error:
 			 logging.error( 'Reload cache from %s failed due to exception' % self.CACHE_FILE_NAME )
@@ -647,6 +728,10 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__category_list.pickle_data( fh )
 			self.__stock_available_list.pickle_data( fh )
 			self.__product_supplier_list.pickle_data( fh )
+			self.__country_list.pickle_data( fh )
+			self.__tax_list.pickle_data( fh )
+			self.__tax_rule_list.pickle_data( fh )
+			self.__tax_rule_group_list.pickle_data( fh )
 		finally:
 			fh.close()
 
@@ -743,6 +828,22 @@ class CachedPrestaHelper( PrestaHelper ):
 	def carriers( self ):
 		""" Return the carrier list """
 		return self.__carrier_list
+
+	@property
+	def countries( self ):
+		return self.__country_list
+
+	@property
+	def taxes( self ):
+		return self.__tax_list
+
+	@property
+	def tax_rules( self ):
+		return self.__tax_rule_list
+
+	@property
+	def tax_rule_groups( self ):
+		return self.__tax_rule_group_list
 
 	@property
 	def order_states( self ):
@@ -1079,6 +1180,7 @@ class CarrierData( BaseData ):
 		self.active  = dic['active' ]
 		self.name    = dic['name' ]
 
+
 class CarrierList( BaseDataList ):
 	""" List of Carriers """
 
@@ -1129,6 +1231,224 @@ class CarrierList( BaseDataList ):
 		if _carrier_data == None:
 			return ''
 		return _carrier_data.name
+
+class CountryData( BaseData ):
+	""" Contains the Country Data """
+	__slots__ = ["id", "iso_code", "active", "name" ] # id_zone not used
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the CountryList """
+		pass
+
+	def __getstate__(self):
+		""" return the current state of the object for pickeling """
+		return {'id':self.id, 'iso_code':self.iso_code, 'active':self.active, 'name':self.name }
+
+	def __setstate__(self, dic ):
+		""" set the current state of object from dic parameter """
+		self.id = dic['id']
+		self.iso_code = dic['iso_code']
+		self.active  = dic['active' ]
+		self.name    = dic['name' ]
+
+
+class CountryList( BaseDataList ):
+	""" List of Countries """
+
+	# used to store inactive and deleted carrier objects
+	inactivelist = []
+
+	def load_from_xml( self, node ):
+		""" Load the Country list with data comming from prestashop search.
+			Must contains nodes: id, iso_code, active, name """
+		# clear the inner lists
+		self.inactivelist = []
+
+		# reload the data
+		items = etree_to_dict( node )
+		items = items['prestashop']['countries']['country']
+		for item in items:
+			_data = CountryData( self.helper )
+			_data.active  = int( item['active'] )
+			_data.id      = int( item['id'] )
+			_data.name    = extract_hashtext( item['name'] ) # ['language']['#text']
+			_data.iso_code= item['iso_code'].upper()
+			if _data.active == 0:
+				self.inactivelist.append( _data )
+			else:
+				self.append( _data )
+
+	def country_from_id( self, Id ):
+		""" Return the CountryData object from record ID """
+		for item in self:
+			if item.id == Id:
+				return item
+		for item in self.inactivelist:
+			if item.id == Id:
+				return item
+		return None
+
+	def country_from_iso_code( self, iso_code ):
+		""" Return the CountryData object from record iso_code """
+		iso_code = iso_code.upper()
+		for item in self:
+			if item.iso_code == iso_code:
+				return item
+		for item in self.inactivelist:
+			if item.iso_code == iso_code:
+				return item
+		return None
+
+class TaxData( BaseData ):
+	""" Contains the Tax Data """
+	__slots__ = ["id", "active", "rate" ] # id_zone not used
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the TaxList """
+		pass
+
+	def __getstate__(self):
+		""" return the current state of the object for pickeling """
+		return {'id':self.id, 'active':self.active, 'rate':self.rate }
+
+	def __setstate__(self, dic ):
+		""" set the current state of object from dic parameter """
+		self.id = dic['id']
+		self.active  = dic['active' ]
+		self.rate    = dic['rate' ]
+
+class TaxList( BaseDataList ):
+	""" List of Taxes """
+
+	# used to store inactive and deleted carrier objects
+	inactivelist = []
+
+	def load_from_xml( self, node ):
+		""" Load the Tax list with data comming from prestashop search.
+			Must contains nodes: id, active, rate """
+		# clear the inner lists
+		self.inactivelist = []
+
+		# reload the data
+		items = etree_to_dict( node )
+		items = items['prestashop']['taxes']['tax']
+		for item in items:
+			_data = TaxData( self.helper )
+			_data.active  = int( item['active'] )
+			_data.id      = int( item['id'] )
+			_data.rate    = float( item['rate'] ) # ['language']['#text']
+			if _data.active == 0:
+				self.inactivelist.append( _data )
+			else:
+				self.append( _data )
+
+	def tax_from_id( self, Id ):
+		""" Return the TaxData object from record ID """
+		for item in self:
+			if item.id == Id:
+				return item
+		for item in self.inactivelist:
+			if item.id == Id:
+				return item
+		return None
+
+class TaxRuleData( BaseData ):
+	""" Contains the Tax Data """
+	__slots__ = ["id", "id_tax", "id_country", "id_tax_rules_group" ]
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the TaxList """
+		pass
+
+	def __getstate__(self):
+		""" return the current state of the object for pickeling """
+		return {'id':self.id, 'id_tax':self.id_tax, 'id_country':self.id_country, 'id_tax_rules_group':self.id_tax_rules_group }
+
+	def __setstate__(self, dic ):
+		""" set the current state of object from dic parameter """
+		self.id = dic['id']
+		self.id_tax  = dic['id_tax' ]
+		self.id_country = dic['id_country' ]
+		self.id_tax_rules_group = dic['id_tax_rules_group' ]
+
+class TaxRuleList( BaseDataList ):
+	""" List of Taxes """
+
+	def load_from_xml( self, node ):
+		""" Load the Tax list with data comming from prestashop search.
+			Must contains nodes: id, id_tax, id_country, id_tax_rules_group """
+		# reload the data
+		items = etree_to_dict( node )
+		items = items['prestashop']['tax_rules']['tax_rule']
+		for item in items:
+			_data = TaxRuleData( self.helper )
+			_data.id      = int( item['id'] )
+			_data.id_tax  = int( item['id_tax'] )
+			_data.id_country = int( item['id_country']['#text'] )
+			_data.id_tax_rules_group = int( item['id_tax_rules_group']['#text'] )
+			self.append( _data )
+
+	def taxrule_from_id( self, Id ):
+		""" Return the TaxRuleData object from record ID """
+		for item in self:
+			if item.id == Id:
+				return item
+		return None
+
+	def taxrule_for_country( self, id_tax_rules_group, id_country ):
+		for item in self:
+			if (item.id_tax_rules_group == id_tax_rules_group) and (item.id_country == id_country):
+				return item
+		return None
+
+class TaxRuleGroupData( BaseData ):
+	""" Contains the Tax Data """
+	__slots__ = ["id", "name", "active" ]
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the TaxList """
+		pass
+
+	def __getstate__(self):
+		""" return the current state of the object for pickeling """
+		return {'id':self.id, 'name':self.name, 'active':self.active }
+
+	def __setstate__(self, dic ):
+		""" set the current state of object from dic parameter """
+		self.id = dic['id']
+		self.name  = dic['name' ]
+		self.active = dic['active' ]
+
+class TaxRuleGroupList( BaseDataList ):
+	""" List of Taxes """
+	inactivelist = []
+
+	def load_from_xml( self, node ):
+		""" Load the Tax list with data comming from prestashop search.
+			Must contains nodes: id, active, name """
+		# clear the inner lists
+		self.inactivelist = []
+
+		items = etree_to_dict( node )
+		items = items['prestashop']['tax_rule_groups']['tax_rule_group']
+		for item in items:
+			_data = TaxRuleGroupData( self.helper )
+			_data.id      = int( item['id'] )
+			_data.active  = int( item['active'] )
+			_data.name    = item['name']
+			if _data.active == 0:
+				self.inactivelist.append( _data )
+			else:
+				self.append( _data )
+
+
+	def taxrulegroup_from_id( self, Id ):
+		""" Return the TaxRuleGroupData object from record ID """
+		for item in self:
+			if item.id == Id:
+				return item
+		return None
+
 
 class SupplierData( BaseData ):
 	""" Contains the Supplier description data """
@@ -1590,12 +1910,20 @@ class ProductData( BaseData ):
 		id_category_default(int)- default category of the product
 		advanced_stock_management(int) - 1/0 for advanced stock management
 		available_for_order(int)       - 1/0
-		ean13(str)	           - ean13 value when available
-		weight(float) - Product weight in Kg
+		ean13(str)	            - ean13 value when available
+		weight(float)           - Product weight in Kg
+		id_tax_rules_group(int) - identification of the Rule taxe applying to the product
 
 	Remarks: directly loaded from by the product list class """
 
-	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "weight" ]
+	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "weight", "id_tax_rules_group","__vat_rate" ]
+
+	def __init__( self, owner ):
+		""" the owner is the PrestaHelper instance which create the
+		data object
+		"""
+		super(ProductData,self).__init__(owner)
+		self.__vat_rate = None # Can be set with update_vat_rate (6,21,20.5)
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an product """
@@ -1603,7 +1931,7 @@ class ProductData( BaseData ):
 
 	def __getstate__(self):
 		""" Return the object state for pickeling """
-		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight }
+		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight, "id_tax_rules_group" : self.id_tax_rules_group }
 
 	def __setstate__(self, dic):
 		""" Set the object state from unpickeling """
@@ -1622,12 +1950,16 @@ class ProductData( BaseData ):
 		else:
 			self.ean13				  = ''
 		self.weight					  = dic['weight']
+		self.id_tax_rules_group		  = dic['id_tax_rules_group']
 
 	def canonical_reference( self ):
 		""" Return the canonical search string of the reference.
 			Allow a better search algorithm """
-
 		return canonical_search_string( self.reference )
+
+	def update_vat_rate( self, vat_rate ):
+		""" Set the VAT rate from external source (6,21,20.5) """
+		self.__vat_rate = vat_rate
 
 	@property
 	def is_combination( self ):
@@ -1647,7 +1979,8 @@ class ProductData( BaseData ):
 	@property
 	def price_ttc(self):
 		""" Calculate the price TTC """
-		return self.price * (1.06 if 'BK-' in self.reference else 1.21)
+		rate = self.__vat_rate if self.__vat_rate else 21.0 # assume a default VAT rate
+		return self.price * (1+(rate/100)) # (1.06 if 'BK-' in self.reference else 1.21)
 
 
 class StockAvailableData( BaseData ):
@@ -1879,6 +2212,15 @@ class BaseProductList( BaseDataList ):
 				self.append( _data )
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
 			_data.weight = float(item['weight'])
+			# id_tax_rules_group may be defined as follow:
+			#   When assigned: <id_tax_rules_group xlink:href="https://www.bonbonz.be/api/tax_rule_groups/55">55</id_tax_rules_group>
+			#   When UNASSIGNED: <id_tax_rules_group>0</id_tax_rules_group>
+			if( type(item['id_tax_rules_group']) is dict ): # Some record may not have tax rules
+				_data.id_tax_rules_group = int(item['id_tax_rules_group']['#text'])
+			else:
+				_data.id_tax_rules_group = 0 # id_tax_rules_group not assigned. Set it to 0 like PrestaShop does
+				if _data.active == 1: # If product is active, this may be a problem
+					print( 'Load product %i: %s. Invalid/Unassigned id_tax_rules_group!' % (_data.id,_data.reference) )
 			return _data
 
 		# empty the list previously loaded

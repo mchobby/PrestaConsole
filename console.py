@@ -61,6 +61,8 @@ from labelprn import handle_print_for_product, print_custom_label_small, handle_
 from labelprn import printer_shortlabel_queue_name, printer_largelabel_queue_name , printer_ticket_queue_name
 from labelprn import print_ticket_batch, print_ticket_transformation
 
+LOCAL_COUNTRY_ISO = 'BE' # Where the software is executed (to evaluate LOCAL VAT tax_rate)
+
 def catch_ctrl_C(sig,frame):
     print "Il est hors de question d'autoriser la sortie sauvage!"
 signal.signal(signal.SIGINT, catch_ctrl_C)
@@ -707,6 +709,8 @@ class App( BaseApp ):
 				_lst.append( psr.product_data.wholesale_price )
 			if self.options['show-product-pv'] == '1':
 				_lst.append( psr.product_data.price )
+				vat_rate = self.cachedphelper.get_tax_rate( psr.product_data.id_tax_rules_group, LOCAL_COUNTRY_ISO  )
+				psr.product_data.update_vat_rate( vat_rate )
 				_lst.append( psr.product_data.price_ttc )
 			if self.options['show-product-ean'] == '1':
 				_lst.append( psr.product_data.ean13 )
@@ -754,20 +758,28 @@ class App( BaseApp ):
 		# test_order_history( _id )
 		# self.test_save_order( 14286 ) # An order from Dominique
 		#self.cachedphelper.get_products( )
-		batch = self.batches.new_batch()
-		batch.data.product_id = 400
-		batch.data.product_reference = 'SUCET-BOUCHE-B-POP'
-		batch.data.product_name      = 'Sucette en forme de bouche - B-pop Mix'
-		batch.data.product_ean       = '3232100004009'
-		batch.data.creation_date     = datetime.datetime.now()
-		batch.data.expiration        = '05/2021' # 'mm/yyyy'
-		batch.data.label_count       = 2 # Number of printeed label
-		batch.data.info = 'Blablabla'
-		self.batches.save_batch( batch )
 
-		print_ticket_batch( batch, batch.data.label_count )
-		print( "Printed" )
+		#batch = self.batches.new_batch()
+		#batch.data.product_id = 400
+		#batch.data.product_reference = 'SUCET-BOUCHE-B-POP'
+		#batch.data.product_name      = 'Sucette en forme de bouche - B-pop Mix'
+		#batch.data.product_ean       = '3232100004009'
+		#batch.data.creation_date     = datetime.datetime.now()
+		#batch.data.expiration        = '05/2021' # 'mm/yyyy'
+		#batch.data.label_count       = 2 # Number of printeed label
+		#batch.data.info = 'Blablabla'
+		#self.batches.save_batch( batch )
 
+		#print_ticket_batch( batch, batch.data.label_count )
+		#print( "Printed" )
+
+		#for item in  self.cachedphelper.countries:
+		#	print( item.id, item.iso_code, item.name );
+
+		#for item in self.cachedphelper.tax_rules:
+		#	print( item.id, item.id_tax, item.id_country, item.id_tax_rules_group );
+		for item in self.cachedphelper.tax_rule_groups:
+			print( item.id, item.name, item.active )
 
 	def save_shipping_nr( self, order_ids, shipping_nr ):
 		""" TEST: read, set status=Shipping, set Shipping_nr THEN save the order.
@@ -852,7 +864,7 @@ class App( BaseApp ):
 				self.output.writeln( '| Rebate      : %5.2f %%  (%6.2f EUR HTVA)' % (self.bag.rebate, totals[3]) )
 				self.output.writeln( '| Total (TTC) : %6.2f Eur (%6.2f TTC)' % (totals[0]-totals[3], (totals[0]-totals[3])*1.21) )
 				if totals[2]>0: # If wholesale price available
-					self.output.writeln( '| Marge revue : %6.2f Eur (%4.2f %%)' % (totals[0]-totals[2]-totals[3], ((totals[0]-totals[2]-totals[3])/totals[2])*100) )
+					self.output.writeln( '| Marge revue : %6.2f Eur (%4.2f%%)' % (totals[0]-totals[2]-totals[3], ((totals[0]-totals[2]-totals[3])/totals[2])*100) )
 				self.output.writeln( '+%s' % ('-'*40) )
 			else:
 				self.output.writeln( 'Rebate      : NO')
@@ -1914,14 +1926,13 @@ class App( BaseApp ):
 		_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _id )
 		# _id may contains a base ID_Product (200) ID or an ID_Product_Combination (178500401)
 		# So we need to be sure to obtain a base product in any case
-		print( 'id : %s ' % _id )
-		print( 'product data:' )
+		print( 'product id : %s' % _id )
 		if is_combination( _id):
-			print( "base product: %s" % unmangle_id_product(_id)[0] )
+			print( "base prod. : %s" % unmangle_id_product(_id)[0] )
 			p_base = self.cachedphelper.products.product_from_id( unmangle_id_product(_id)[0] ) # find the base product from the combination product
-			print( p_base )
+			# print( p_base )
 		else:
-			print( "no combination for %s" %_id)
+			print( "base prod. : no combination for %s" %_id)
 			p_base = p # The product is already a base product
 		# Taux de Marge / Marging rate
 		try:
@@ -1941,7 +1952,11 @@ class App( BaseApp ):
 		self.output.writeln( 'ID         : %s  (%s)' % (p.id, 'active' if p.active==1 else 'INACTIVE') )
 		self.output.writeln( 'P.A. (%%)   : %6.2f (%4.1f %% MARGIN rate)' %  (p.wholesale_price,_margin) )
 		self.output.writeln( 'P.V. (%%)   : %6.2f (%4.1f %% brand  rate)' %  (p.price, _marque ) )
+		vat_rate = self.cachedphelper.get_tax_rate( p.id_tax_rules_group, LOCAL_COUNTRY_ISO  )
+		p.update_vat_rate( vat_rate )
 		self.output.writeln( 'P.V. TTC   : %6.2f' % ( p.price_ttc ) )
+		self.output.writeln( 'VAT rate   : %6.2f%%' % (vat_rate) )
+
 		self.output.writeln( ' ' )
 		# If stock_available (only reloabale for basic product)
 		if _sa and not(is_combination(_id)):
