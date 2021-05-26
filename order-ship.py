@@ -225,10 +225,18 @@ class OrderShipApp():
 
 		cmd_type,cmd_data, cmd_mult = CMD.RAW, '', 1
 		while not((cmd_type==CMD.RAW) and (cmd_data.upper()=='EXIT')):
-			cmd_type,cmd_data,cmd_mult = self.get_cmd( prompt="%-13s > "%AppState(self.state).name, debug=False)
+			cmd_type,cmd_data,cmd_mult = self.get_cmd( prompt="%s: %-13s > "%(config.prompt ,AppState(self.state).name), debug=False)
 
 			# -- Append extra info to CarbonCopy -------------------------------
+			self.output.writeln( 'CMD: %s, %s, %s' % (cmd_type,cmd_data,cmd_mult) )
 			self.output.carbon_copy.append(  'CMD: %s, %s, %s' % (cmd_type,cmd_data,cmd_mult))
+			# -- Shell execute -------------------------------------------------
+			if ( (cmd_type == CMD.RAW) and (len(cmd_data)>0) and (cmd_data[0]=='!') ):
+				shell_cmd = cmd_data[1:]
+				self.output.writeln( 'Shell exec: %s' % (shell_cmd) )
+				os.system( shell_cmd )
+				continue
+
 			# -- Reset All -----------------------------------------------------
 			if (cmd_type == CMD.VERB and cmd_data == 'RESET' ):
 				self.reset_all()
