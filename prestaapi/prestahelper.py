@@ -1632,9 +1632,9 @@ class ProductSupplierList( BaseDataList ):
 		:param partialref: The partial reference to search for.
 		:returns: list of ProductSupplier. """
 		_result = []
-		partialref = partialref.upper()
+		partialref = canonical_search_string( partialref )
 		for item in self:
-			if item.reference and  (partialref in item.reference.upper()):
+			if item.reference and  (partialref in canonical_search_string( item.reference )):
 				_result.append( item )
 		return _result
 
