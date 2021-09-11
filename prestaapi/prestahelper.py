@@ -210,6 +210,65 @@ class PrestaHelper(object):
 		customer.load_from_xml( el )
 		return customer
 
+	def get_product_at_data( self, id_product, default_lang_id=2 ):
+		""" Extract the extra @DATA information hidden inside the product description.
+
+			Return None if empty otherwise, a list of string"""
+		# <language id="2" xlink:href="https://shop.mchobby.be/api/languages/2">
+		#    <!-- @DATA
+		#    [TRANSFORM]
+		#    ; release r3 ...
+		#    -0*PRES-SOUDER-L ;info
+		#    -->
+		# <h2>Découvrir l'électronique
+		el = self.__prestashop.search( 'products', options = {'display':'[id,description]', 'filter[id]': '[%i]' % id_product } )
+		# save_to_file('product_description', el )
+		item = etree_to_dict( el )
+		# print( item['prestashop']['products']['product']['description'] )
+		descr = ''
+		for dico in item['prestashop']['products']['product']['description']['language']:
+			if dico['@id']==str(default_lang_id):
+				descr = dico['#text']
+		if len(descr)==0:
+			return None
+		r = []
+		start_capture = False
+		for line in descr.split('\n'):
+			if ('<!--' in line) and ('@DATA' in line):
+				start_capture = True
+				continue
+			if start_capture and ('-->' in line):
+				break
+			if start_capture:
+				r.append(line)
+		return None if len(r)==0 else r
+
+	def get_product_at_data_section( self, id_product, section_name):
+		""" extract a given section name from the @DATA string hidden in the product
+		description """
+		section_name = section_name.upper()
+		at_data = self.get_product_at_data( id_product )
+		if at_data==None:
+			return ''
+
+		r = []
+		start_capture = False
+		for line in at_data:
+			if ('[%s]' % section_name) in line:
+				start_capture = True
+				continue
+			# Another section ?
+			if ('[' in line) and (']' in line) and start_capture:
+				break
+			# Empty line
+			if len( line.strip() )==0:
+				continue
+			if start_capture:
+				r.append( line )
+
+		return None if len(r)==0 else r
+
+
 	def get_customerthread( self, id ):
 		""" Retreive the custom thread data from thread id
 
@@ -303,7 +362,7 @@ class PrestaHelper(object):
 		#el = self.__prestashop.search( 'products' )
 		#print( ElementTree.tostring( el ) )
 
-		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,weight,id_tax_rules_group]'} )
+		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,upc,weight,id_tax_rules_group]'} )
 		#print( ElementTree.tostring( el ) )
 
 		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
@@ -555,6 +614,7 @@ class ProductSearchResult( object ):
 		self._product_suppliers = []
 		self._qty = 0            # Qty in Stock
 		self._ordered_qty = None # Optinal : an ordered quantity
+		self._remark = None # append a remark text for the line
 
 	@property
 	def product_data( self ):
@@ -570,7 +630,7 @@ class ProductSearchResult( object ):
 
 	@qty.setter
 	def qty(self, value):
-	    self._qty = value
+		self._qty = value
 
 	@property
 	def ordered_qty( self ):
@@ -587,6 +647,16 @@ class ProductSearchResult( object ):
 		return self._product_suppliers
 
 	@property
+	def remark( self ):
+		""" None or the remark set for this line """
+		return self._remark
+
+	@remark.setter
+	def remark( self, value ):
+		""" Set the remark string """
+		self._remark = value
+
+	@property
 	def supplier_refs( self ):
 		""" Return a concatenated string of supplier refs """
 		return ", ".join( [ps.reference for ps in self._product_suppliers] )
@@ -596,7 +666,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 7
+	CACHE_FILE_VERSION = 8
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -1911,12 +1981,13 @@ class ProductData( BaseData ):
 		advanced_stock_management(int) - 1/0 for advanced stock management
 		available_for_order(int)       - 1/0
 		ean13(str)	            - ean13 value when available
+		upc(int)				- Universal Product Code, an integer that can be used for something else
 		weight(float)           - Product weight in Kg
 		id_tax_rules_group(int) - identification of the Rule taxe applying to the product
 
 	Remarks: directly loaded from by the product list class """
 
-	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "weight", "id_tax_rules_group","__vat_rate" ]
+	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "upc", "weight", "id_tax_rules_group","__vat_rate" ]
 
 	def __init__( self, owner ):
 		""" the owner is the PrestaHelper instance which create the
@@ -1924,6 +1995,7 @@ class ProductData( BaseData ):
 		"""
 		super(ProductData,self).__init__(owner)
 		self.__vat_rate = None # Can be set with update_vat_rate (6,21,20.5)
+		self.upc = None
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an product """
@@ -1931,7 +2003,7 @@ class ProductData( BaseData ):
 
 	def __getstate__(self):
 		""" Return the object state for pickeling """
-		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight, "id_tax_rules_group" : self.id_tax_rules_group }
+		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight, "id_tax_rules_group" : self.id_tax_rules_group, "upc": self.upc }
 
 	def __setstate__(self, dic):
 		""" Set the object state from unpickeling """
@@ -1949,6 +2021,10 @@ class ProductData( BaseData ):
 			self.ean13				  = dic['ean13']
 		else:
 			self.ean13				  = ''
+		if 'upc' in dic:
+			self.upc 				  = int(dic['upc'])
+		else:
+			self.upc				  = None
 		self.weight					  = dic['weight']
 		self.id_tax_rules_group		  = dic['id_tax_rules_group']
 
@@ -1981,6 +2057,12 @@ class ProductData( BaseData ):
 		""" Calculate the price TTC """
 		rate = self.__vat_rate if self.__vat_rate else 21.0 # assume a default VAT rate
 		return self.price * (1+(rate/100)) # (1.06 if 'BK-' in self.reference else 1.21)
+
+	@property
+	def unrepeatable_order_qty(self):
+		""" Quantity that should absolutely/exceptionnaly be order for
+			stock management raison. Data is stored into the UPC's product field """
+		return self.upc
 
 
 class StockAvailableData( BaseData ):
@@ -2211,6 +2293,7 @@ class BaseProductList( BaseDataList ):
 			else:
 				self.append( _data )
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
+			_data.upc   = int(item['upc'])   if item['upc']!=None else 0
 			_data.weight = float(item['weight'])
 			# id_tax_rules_group may be defined as follow:
 			#   When assigned: <id_tax_rules_group xlink:href="https://www.bonbonz.be/api/tax_rule_groups/55">55</id_tax_rules_group>
@@ -2298,6 +2381,18 @@ class BaseProductList( BaseDataList ):
 		if not self.combinationlist:
 			return None
 		return self.combinationlist.get_combinations( id_product )
+
+	def product_from_reference( self, reference, include_inactives = True ):
+		""" Return the ProductData object from product ID """
+		reference = reference.strip().upper()
+		for item in self:
+			if item.reference.strip().upper() == reference:
+				return item
+		if include_inactives:
+			for item in self.inactivelist:
+				if item.reference.strip().upper() == reference:
+					return item
+		return None
 
 
 	def product_from_id( self, id_product, include_inactives = True ):

@@ -33,8 +33,8 @@ key-in a <console_command> || <filter_text> will filters the console_command res
 
 It also exist bag manipulation commands
 	* add/remove IDs       with +3*125 or -4*1024
-    * add/remove TEXT      with +3*gsm or +3*g125 or -2*demo
-    * add/remove single ID with +123   or -123
+	* add/remove TEXT      with +3*gsm or +3*g125 or -2*demo
+	* add/remove single ID with +123   or -123
 
 Quick help :
 ------------
@@ -56,6 +56,7 @@ that allows to write commands like:
   list supplier hardk | grep C2
 	list product * | grep as_int
 	mearm | grep -i microbit
+	mearm || microbit
 
 Startup file :
 --------------
@@ -165,7 +166,7 @@ check ean config :
   List all the product with incorrect EAN value.
 	The ean is read from the product recalculated and compared again with
 	the product ean. If it doesn't match then the product is listed down
-	in the output result. 
+	in the output result.
 
 ean <ID> :
 
@@ -335,8 +336,16 @@ reload stock :
 
 show product <ID> :
 
-  Show the details about the <ID> product
+  Show the details about the <ID> product.
+	The short command for this is .<ID>
 
+
+Make transform <ID> <qty>:
+
+		Make <qty> product <ID> from sub-product. The <ID> product must have a T:1 params
+		and a @DATA with [TRANSFORM] section to indicates the sub-products.
+		This command will show stock needs and requires confirmation before applying
+		stock updates.
 
 save :
 

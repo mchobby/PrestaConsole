@@ -42,6 +42,7 @@ import xml.etree.cElementTree as etree
 import tempfile
 import datetime
 from bag import ToteBag, ToteItem
+from transform import TransformList
 from batch import BatchFactory, EBatch
 import cmd
 import sys
@@ -64,7 +65,7 @@ from labelprn import print_ticket_batch, print_ticket_transformation
 LOCAL_COUNTRY_ISO = 'BE' # Where the software is executed (to evaluate LOCAL VAT tax_rate)
 
 def catch_ctrl_C(sig,frame):
-    print "Il est hors de question d'autoriser la sortie sauvage!"
+    print( "Il est hors de question d'autoriser la sortie sauvage!" )
 signal.signal(signal.SIGINT, catch_ctrl_C)
 
 
@@ -472,6 +473,7 @@ COMMANDS = [
 	('show debug'     , 0   ),
 	('show option'    , '*' ),
 	('show product'   , 1   ),
+	('make transform' , 2   ),
 	('show stat'      , 0   ),
 	('upgrade'        , 0   )
 	]
@@ -572,6 +574,7 @@ class App( BaseApp ):
 
 	def get_qm_info( self, psr ):
 		""" generate the 'Quantity Minimum Warning' message for a given product.
+		    Also generates the warning for initialized unrepeatable_order_qty
 
 			:param psr: ProductSearchResult item for whom the QM Warning should be computed.
 			:return: tuple of ( qm_value, qm_warning_message ) value. Note that qm_warning is empty string when there is no warning.
@@ -589,7 +592,11 @@ class App( BaseApp ):
 		else:
 			value1 = '---'
 		# The QM warning value
-		if psr.qty <= 0:
+		if psr.product_data.unrepeatable_order_qty > 0:
+			value2 = '%s' % (-1*psr.product_data.unrepeatable_order_qty)
+			if psr.qty < 0: # Also append it when we have negative qty in stock
+				value2 += '%+i' % psr.qty
+		elif psr.qty <= 0:
 			value2 = '%s' % psr.qty
 		elif _qm and (psr.qty <= _qm):
 			value2 = '!!!'
@@ -633,8 +640,8 @@ class App( BaseApp ):
 		sTitle += '%9s | %-30s | %5s' % ('ID', 'Reference', 'stock' )
 		sPrint += '%9i | %-30s | %5i'
 		if self.options['show-product-qm']=='1':
-			sTitle += ' | %5s | %3s' % ('QM', '/!\\' )
-			sPrint += ' | %5s | %3s'
+			sTitle += ' | %5s | %8s' % ('QM', '/!\\' )
+			sPrint += ' | %5s | %8s'
 		if self.options['show-product-qo']=='1':
 			sTitle += ' | %5s' % 'QO'
 			sPrint += ' | %5s'
@@ -717,7 +724,13 @@ class App( BaseApp ):
 			_lst.append( psr.supplier_refs )
 
 			# Go for display
+			if psr.remark != None:
+				self.output.writeln( '' )
+				self.output.writeln( '     %s' % psr.remark )
 			self.output.writeln( sPrint % tuple( _lst ) )
+			if psr.remark != None:
+				self.output.writeln( '' )
+
 			_count += 1
 
 		self.output.writeln( '%s rows in result' % _count )
@@ -1742,6 +1755,11 @@ class App( BaseApp ):
 				psr_lst.filter_out( lambda psr : self.get_qm_info(psr)[1] == '' )
 
 			sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
+			# Check if we do need to add a Remark
+			for item in sorted_lst:
+				if item.product_data.unrepeatable_order_qty > 0:
+					item.remark = '/!\\ %i x UNREPEATABLE ORDER QUANTITY /!\\' % item.product_data.unrepeatable_order_qty
+
 			self.output_product_search_result( psr_list = sorted_lst )
 			if 'order' in extra_params:
 				# Calculate buy estimation (based on QM)
@@ -1941,7 +1959,6 @@ class App( BaseApp ):
 			_margin = -1
 		# Taux de marque / Brand rating
 		try:
-
 			_marque = (p.price-p.wholesale_price) / p.price * 100
 		except:
 			_marque = -1
@@ -1973,6 +1990,7 @@ class App( BaseApp ):
 		# PARAMS
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )
+		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty > 0 else '---') )
 		self.output.writeln( 'Weight     : %6.3f Kg' % p.weight )
 
 		# Supplier Ref
@@ -1985,11 +2003,125 @@ class App( BaseApp ):
 		_supp_refs = self.cachedphelper.product_suppliers.suppliers_for_id_product( _id )
 		self.output.writeln( 'Suppliers  : %s' % ', '.join([ref.reference for ref in _supp_refs if ref.reference != _supp_ref  and ref.id_supplier != self.ID_SUPPLIER_PARAMS ]) )
 
+		# 'T'ransformation param present ?
+		if 'T' in _p:
+			# Extract @Data from product description
+			at_data = self.cachedphelper.get_product_at_data_section( _id, 'TRANSFORM' )
+			if at_data:
+				transform = TransformList()
+				transform.parse_list( at_data )
+				self.output.writeln('')
+				self.output.writeln('--- Transformation Data ---')
+				for line in transform.comments:
+					self.output.writeln( 'Remark: %s' % line )
+				self.output.writeln( "" )
+				self.output.writeln( "  : Movement                                : Remark                         : Stock")
+				self.output.writeln( "--:-----------------------------------------:--------------------------------:------")
+				item = transform.creating
+				self.output.writeln( "%-1s : %6.2f x %-30s : %-30s : see upper" % ('', item.required_qty, item.reference, item.comment) )
+				self.output.writeln( "--:-----------------------------------------:--------------------------------:------")
+
+				__pa_pricing = 0
+				for item in transform.sourcing:
+					__alert = ''
+					# Détail for the product
+					_p = self.cachedphelper.products.product_from_reference( item.reference, include_inactives=True )
+					if _p == None:
+						self.output.writeln('[ERROR] cannot find id for product %s' % item.reference)
+						__alert = '!'
+					else:
+						item._product = _p
+						__pa_pricing += abs(item.required_qty)*_p.wholesale_price
+					# Stock available for the product
+					__qty_available = 0
+					_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _p.id )
+					if _sa and not(is_combination(_id)):
+						__qty_available = _sa.quantity
+					else:
+						self.output.writeln('[ERROR] cannot find stock available for product %s (%i)' % (item.reference,_p.id))
+					if __qty_available < abs(item.required_qty):
+						__alert = '!'
+					# Output the data
+					self.output.writeln( "%-1s : %6.2f x %-30s : %-30s : %5i" % (__alert, item.required_qty, item.reference, item.comment, __qty_available) )
+				# Evaluate properly the __pa (because we can create multiple product from the transformation)
+				self.output.writeln( "--:-----------------------------------------:--------------------------------:------")
+				self.output.writeln( 'Total PA/unit = %6.2f EUR' % (__pa_pricing/transform.creating.required_qty ))
+
 
 		#self.output.writeln( 'Stock Mngt    : %s' % 'yes' if p.advanced_stock_management == 1 else 'NO' )
 		#self.output.writeln( 'Avail.f.order : %s' % 'yes' if p.available_for_order == 1 else 'NO' )
-		# xxx
 
+
+	def do_make_transform( self, params ):
+		""" Read the transform section of target product, evaluate needs in sub-products
+			then suggest the needed stock updates """
+		_id = int( params[0] ) # use the id provided on the command line
+		_qty = int( params[1] ) # use the id provided on the command line
+		if _qty <= 0:
+			raise Exception( 'Qty must be a positive number!' )
+
+		p = self.cachedphelper.products.product_from_id( _id )
+		if not( p ):
+			self.output.writeln( 'No product identified for ID %i' % _id )
+		# PARAMS
+		_p = self.get_product_params( _id )
+		_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _id )
+
+		# xxx
+		self.output.writeln( 'Product ID : %s' % _id )
+		self.output.writeln( 'Reference  : %s' % p.reference )
+		self.output.writeln( 'Name       : %s' % p.name )
+		self.output.writeln( 'Qty        : %i ' % _sa.quantity )
+		if not ('T' in _p):
+			raise Exception( '%s has not transformation flag T in params!' % p.reference )
+
+		# Extract @Data from product description
+		at_data = self.cachedphelper.get_product_at_data_section( _id, 'TRANSFORM' )
+		if not at_data:
+			raise Exception('No @DATA and/or [TRANSFORM] hidden into product description')
+
+		transform = TransformList()
+		transform.parse_list( at_data )
+
+		# We must only create multiple of +qty line mentionned into the [TRANSFORM] section
+		item = transform.creating
+		if (_qty%item.qty) != 0:
+			raise Exception('Quantity must be a multiple of %i' % item.qty)
+		transform.multiplier = _qty//item.qty
+
+		for line in transform.comments:
+			self.output.writeln( 'Remark     : %s' % line.strip() )
+
+		# List down the items
+		self.output.writeln( "" )
+		self.output.writeln( "  :Stock : Movement                                : Remark                         ")
+		self.output.writeln( "--:------:-----------------------------------------:--------------------------------")
+
+		self.output.writeln( "%-1s : ---  : %6.2f x %-30s : %-30s :" % ('', item.required_qty, item.reference, item.comment) )
+		self.output.writeln( "--:------:-----------------------------------------:--------------------------------")
+
+		for item in transform.sourcing:
+			__alert = ''
+			# Détail for the product
+			_p = self.cachedphelper.products.product_from_reference( item.reference, include_inactives=True )
+			if _p == None:
+				self.output.writeln('[ERROR] cannot find id for product %s' % item.reference)
+				__alert = '!'
+			else:
+				item._product = _p
+			# Stock available for the product
+			__qty_available = 0
+			_sa = self.cachedphelper.stock_availables.stockavailable_from_id_product( _p.id )
+			if _sa and not(is_combination(_id)):
+				__qty_available = _sa.quantity
+			else:
+				self.output.writeln('[ERROR] cannot find stock available for product %s (%i)' % (item.reference,_p.id))
+			if __qty_available < abs(item.required_qty):
+				__alert = '!'
+			# Output the data
+			self.output.writeln( "%-1s :%5i : %6.2f x %-30s : %-30s " % (__alert, __qty_available, item.required_qty, item.reference, item.comment) )
+		# Evaluate properly the __pa (because we can create multiple product from the transformation)
+		self.output.writeln( "--:------:-----------------------------------------:--------------------------------")
 
 
 	def do_set_debug( self, params ):
