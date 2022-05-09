@@ -176,12 +176,12 @@ if __name__ == '__main__':
 		curr_month = now.strftime('%Y%m')
 		main( curr_month ) # Process current month
 
-		# Process last month every 5 iteration
-		if (iteration%5) == 0:
+		# Process last month every 5 iteration (or at restart)
+		if (iteration%5) == 0 or iteration==1:
 			one_month = datetime.timedelta(days=31)
 			prev_month = now - one_month
 			prev_month = prev_month.strftime('%Y%m')
-			print( 'process previous month')
+			print( 'process previous month %s' % prev_month )
 			main( prev_month ) # process previous month (if any shipping remain there)
 
 		print( 'pause %i min' % PAUSE_MIN )

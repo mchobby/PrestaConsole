@@ -2121,7 +2121,7 @@ class StockAvailableList( BaseDataList ):
 		for item in items:
 			# Sometime, the stock_available does not contains a valid ID_product
 			if not( '#text' in item['id_product'] ):
-				print( "stock_available: record id %s as invalid id_product %s" % (item['id'], item['id_product']) )
+				print( "stock_available: record id %s has invalid id_product %s" % (item['id'], item['id_product']) )
 				continue
 
 			_data = StockAvailableData( self.helper )
@@ -2200,7 +2200,7 @@ class CombinationList( BaseDataList ):
 		for item in items:
 			# Sometime, the combination does not contains a valid ID_product
 			if not( '#text' in item['id_product'] ):
-				print( "Combination: record id %s as invalid id_product %s" % (item['id'], item['id_product']) )
+				print( "Combination: record id %s has invalid id_product %s" % (item['id'], item['id_product']) )
 				continue
 			# print( item )
 			_data = CombinationData( self.helper )
@@ -2293,7 +2293,7 @@ class BaseProductList( BaseDataList ):
 			else:
 				self.append( _data )
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
-			_data.upc   = int(item['upc'])   if item['upc']!=None else 0
+			_data.upc   = int(item['upc'])   if item['upc']!=None else None
 			_data.weight = float(item['weight'])
 			# id_tax_rules_group may be defined as follow:
 			#   When assigned: <id_tax_rules_group xlink:href="https://www.bonbonz.be/api/tax_rule_groups/55">55</id_tax_rules_group>

@@ -1539,6 +1539,9 @@ class App( BaseApp ):
 				id_product = int(row.id_product)
 				t = self.get_product_tariff( id_product ) # ( Country_iso, Tariff, Weight )
 				p = self.cachedphelper.products.product_from_id( id_product, include_inactives=True )
+				if t[0]==None: # No tariff information
+						self.output.writeln( "No tariff information for %s (%i) !!!" % (p.reference, id_product) )
+						continue
 				self.output.writeln( sFormat % (row.ordered_qty, row.reference, t[0], t[1], t[2], row.unit_price, row.ordered_qty * row.unit_price) )
 
 		def update_order_send():
@@ -1990,7 +1993,7 @@ class App( BaseApp ):
 		# PARAMS
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )
-		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty > 0 else '---') )
+		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty >= 0 else '---') )
 		self.output.writeln( 'Weight     : %6.3f Kg' % p.weight )
 
 		# Supplier Ref
