@@ -2121,7 +2121,7 @@ class StockAvailableList( BaseDataList ):
 		for item in items:
 			# Sometime, the stock_available does not contains a valid ID_product
 			if not( '#text' in item['id_product'] ):
-				print( "stock_available: record id %s as invalid id_product %s" % (item['id'], item['id_product']) )
+				print( "stock_available: record id %s has invalid id_product %s" % (item['id'], item['id_product']) )
 				continue
 
 			_data = StockAvailableData( self.helper )
