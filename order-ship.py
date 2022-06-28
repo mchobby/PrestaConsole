@@ -41,7 +41,8 @@ VERBS = { '3232900000010' : 'CANCEL'   , # 1:
 		  '3232900000034' : 'CHECK'    , # 3: check (if shipping is ok)
 		  '3232900000041' : 'FINALIZE' , # 4: finalize (the shipping by sending mail & archiving)
 		  '3232900000058' : 'RESET'    , # 5: Reset
-		  '3232900000065' : 'APPEND'     # 6: Append an order to shipping
+		  '3232900000065' : 'APPEND'   , # 6: Append an order to shipping
+		  '3232900000072' : 'SWITCH_FORCE' # 7: Switch the force flag
 		  }
 
 CARRIERS = { '3232800010003' : 'POSTE'  , # 1000
@@ -125,7 +126,7 @@ class OrderShipApp():
 		global re_add_remove_several_id
 		v = ''
 		while len(v)==0:
-			v = v = raw_input( prompt )
+			v = raw_input( prompt ) # Domeu
 			v = v.strip()
 
 		# Manage the multiplier case
@@ -151,6 +152,10 @@ class OrderShipApp():
 			# Special VERB to translate in action
 			if _cmd_data == 'APPEND':
 				_cmd_type = CMD.APPEND_ORDER
+
+			if _cmd_data == 'SWITCH_FORCE':
+				self.force_flag = not( self.force_flag )
+				self.output.writeln( 'Force Flag set %s' % self.force_flag )
 
 		elif _ean_type == EanType.CARRIER:
 			# decode the CARRIER barre code
@@ -179,7 +184,9 @@ class OrderShipApp():
 
 	def check_scanned( self ):
 		# Check if the scanned items correspond to the order !
+		self.force_flag = False
 		_flag = True
+		_errors = [] # contains the error lines
 		self.output.writeln( '-'*80)
 		self.output.writeln( 'Order   : %s' % self.order.id )
 		for _joined_order in self.joined_order:
@@ -196,9 +203,16 @@ class OrderShipApp():
 		for row in self.order.rows:
 			_ok     = row.ordered_qty == self.scan[row.id_product]
 			_status = 'OK' if _ok else '-!-'
+			_line   =  '%5s | %4i | %5i | %s ' % (_status,self.scan[row.id_product],row.ordered_qty,row)
 			if not(_ok):
 				_flag = False
-			self.output.writeln( '%5s | %4i | %5i | %s ' % (_status,self.scan[row.id_product],row.ordered_qty,row) )
+				_errors.append[ _line ]
+			else:
+				self.output.writeln( _line )
+		# if we had error... then display all errors at the end
+		if len( _errors )>0:
+			for line in _errors:
+				self.output.writeln( _line )
 		return _flag
 
 	def reset_all( self ):
@@ -209,6 +223,7 @@ class OrderShipApp():
 		self.state = AppState.WAIT_ORDER
 		self.carrier  = ''
 		self.shipping_number = ''
+		self.force_flag = False
 		self.output.reset_carbon_copy()
 		for i in range( 5 ):
 			print( " " ) # Do not register this message
@@ -303,7 +318,7 @@ class OrderShipApp():
 				continue
 
 			# -- Append order --------------------------------------------------
-			# User selected APPEND ORDER carcode
+			# User selected APPEND ORDER barcode
 			if (cmd_type == CMD.APPEND_ORDER):
 				if self.state != AppState.CONTROL_ORDER:
 					self.output.writeln("[ERROR] No order loaded")
@@ -391,9 +406,13 @@ class OrderShipApp():
 					self.output.writeln("[ERROR] No order loaded")
 					self.beep()
 				else:
-					if not( self.check_scanned() ):
-						self.beep()
-						continue
+					if self.force_flag:
+						self.output.writeln("FORCING finalisation")
+					else:
+						if not( self.check_scanned() ):
+							self.beep()
+							continue
+					self.force_flag = False # Reset it
 					self.output.writeln("")
 					self.output.writeln("ORDER ID %i CHECK SUCCESSFULLY" % self.order.id )
 					self.output.writeln("CUSTOMER       : %s" % self.customer.customer_name )
