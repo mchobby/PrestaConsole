@@ -82,6 +82,7 @@ class OrderShipApp():
 		self.h = CachedPrestaHelper( self.config.presta_api_url, self.config.presta_api_key, debug= False )
 		self.output = PrestaOut()
 		self.state  = AppState.WAIT_ORDER
+		self.force_flag = False
 		# Loaded order
 		self.order    = None
 		self.joined_order = [] # other order joined to the shipping
