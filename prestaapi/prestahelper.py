@@ -1080,6 +1080,10 @@ class OrderRowData( BaseData ):
 		def _extract( dic, key ):
 			if key in dic:
 				value = dic[key]
+				# does it contains a dict with #text?
+				# {'@{http://www.w3.org/1999/xlink}href': 'https://shop.mchobby.be/api/products/429', '#text': '429'}
+				if type( value ) is dict:
+					return value['#text']
 				return value
 			return None
 
