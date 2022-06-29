@@ -207,7 +207,7 @@ class OrderShipApp():
 			_line   =  '%5s | %4i | %5i | %s ' % (_status,self.scan[row.id_product],row.ordered_qty,row)
 			if not(_ok):
 				_flag = False
-				_errors.append[ _line ]
+				_errors.append( _line )
 			else:
 				self.output.writeln( _line )
 		# if we had error... then display all errors at the end
