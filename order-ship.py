@@ -213,7 +213,7 @@ class OrderShipApp():
 		# if we had error... then display all errors at the end
 		if len( _errors )>0:
 			for line in _errors:
-				self.output.writeln( _line )
+				self.output.writeln( line )
 		return _flag
 
 	def reset_all( self ):
