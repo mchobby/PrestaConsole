@@ -352,6 +352,13 @@ save :
   save the current data to the cache file.
 
 
+update product <ID> <key=value,...>
+		With ID only --> Show the product XML
+		Otherwise check 'key' and apply the value. Any error would skip saving.
+
+		update product 2328 date_add=10/07/2022
+		update product 2328 date_add=NOW
+
 TUNING Commands :
 =================
 

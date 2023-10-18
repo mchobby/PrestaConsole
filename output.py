@@ -25,6 +25,8 @@ MA 02110-1301, USA.
 
 import tempfile
 import codecs
+import json
+import datetime
 
 class PrestaOut( object ):
 	""" Class to manage the ouput of data to various streams """
@@ -111,3 +113,58 @@ class PrestaOut( object ):
 						except:
 							f.write( '...' )
 					f.write( '\r\n' )
+
+class SerialNumberData():
+	__slots__ = ('scan_date', 'order_id','order_date', 'product_id','product_ref','sn', 'remark' )
+
+	def __init__(self, order, product, sn, remark=None ):
+		self.scan_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Same format as object
+		self.order_id = order.id
+		self.order_date = order.date_add
+		self.product_id = product.id_product
+		self.product_ref = product.reference
+		self.sn = sn
+		self.remark = remark
+
+# subclass JSONEncoder
+class SerialNumberDataEncoder(json.JSONEncoder):
+	def default(self, o):
+		return [ o.__class__.__name__, o.__dict__ ]
+
+class SerialNumberLog( object ):
+	""" Class to manage Serial Number Logs """
+
+	def __init__( self ):
+		self.items = None
+		self.__idx = -1 # Iterator index
+		self.reset()
+
+	def reset( self ):
+		self.items = []
+
+	def __len__( self ):
+		return len(self.items)
+
+	def __iter__(self):
+		return iter( self.items )
+
+	#def __next__(self):
+	#	self.__idx += 1
+	#	if self.__idx >= len(self.items):
+	#		raise StopIteration
+	#	else:
+	#		return self.items[self.__idx] # returns a SerialNumberData
+
+	def append( self, order, product, sn, remark=None ):
+		self.items.append( SerialNumberData( order, product, sn, remark ) )
+
+	def save( self, filename ):
+		""" Save the serials to a JSON file (only if something to be saved)"""
+		if len( self.items )==0:
+			return
+		with codecs.open( filename, 'w', encoding='utf8' ) as f:
+			json.dump( self.items, f , indent=4, cls=SerialNumberDataEncoder )
+
+	def load ( self, filename ):
+		""" Reload the serials from the saved JSON file """
+		pass

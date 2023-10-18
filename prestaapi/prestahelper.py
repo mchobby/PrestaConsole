@@ -353,16 +353,16 @@ class PrestaHelper(object):
 		""" retreive a list of products from PrestaShop """
 		# combinations are used to create the various "declinaisons" of a single product
 		logging.debug( 'read combinations' )
-		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price,weight]' } )
+		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price,weight,mpn]' } ) # read mpn?
 		_combinations = CombinationList( self )
 		#save_to_file( 'get_products_combinations', el )
 		_combinations.load_from_xml( el )
 
 		logging.debug( 'read products' )
-		#el = self.__prestashop.search( 'products' )
 		#print( ElementTree.tostring( el ) )
 
-		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,upc,weight,id_tax_rules_group]'} )
+		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,upc,weight,id_tax_rules_group,mpn]'} )
+		# save_to_file( 'get_products', el )
 		#print( ElementTree.tostring( el ) )
 
 		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
@@ -666,7 +666,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 8
+	CACHE_FILE_VERSION = 9
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -1073,7 +1073,7 @@ class OrderRowData( BaseData ):
 	""" Details of rows in the order.
 
 		Remarks: this class is instanciated by OrderData.load_from_xml() """
-	__slots__ = ["id", "id_product", "ordered_qty", "reference", "unit_price_ttc", "unit_price", "ean13" ]
+	__slots__ = ["id", "id_product", "ordered_qty", "reference", "unit_price_ttc", "unit_price", "ean13", "mpn" ]
 
 	def load_from_items( self, dic ):
 		# dic is a dictionnary with key=value pairs
@@ -1097,6 +1097,7 @@ class OrderRowData( BaseData ):
 		self.unit_price_ttc = float( _extract(dic,"unit_price_tax_incl") ) # TTC
 		self.unit_price     = float( _extract(dic,"unit_price_tax_excl") ) # HTVA
 		self.ean13			= _extract(dic,"product_ean13")
+		self.mpn			= _extract(dic,"product_mpn")
 
 	def __repr__( self ):
 		return "%4s x %-30s (%5s) @ %7.2f htva/p" % ( self.ordered_qty, self.reference, self.id_product, self.unit_price )
@@ -1653,8 +1654,6 @@ class ProductSupplierList( BaseDataList ):
 			_data.reference   = item['product_supplier_reference']
 			if _data.reference == None:
 				_data.reference = ''
-			if _data.id == 267800447:
-				print( _data.reference )
 			self.append( _data )
 
 	def pickle_data( self, fh ):
@@ -1940,10 +1939,11 @@ class CombinationData( BaseData ):
 		id_product(int) - related product ID
 		reference(str)  - reference of the product (ex:FEATHER-CASE-TFT-WHITE)
 		ean13(str)      - ean13 if available
+		mpn(str)		- Manufacturer Part Number (may also contains manufacturer EAN)
 
 	Remarks: directly loaded from the CombinationList class"""
 
-	__slots__ = ["id", "id_product", "reference", "ean13", "wholesale_price", "price"]
+	__slots__ = ["id", "id_product", "reference", "ean13", "wholesale_price", "price", "mpn"]
 
 	def load_from_xml( self, node ):
 		""" Initialise the data from a combination """
@@ -1951,7 +1951,7 @@ class CombinationData( BaseData ):
 
 	def __getstate__(self):
 		""" return the object state for pickeling """
-		return {"id":self.id, "id_product" : self.id_product, "reference" : self.reference, "ean13" : self.ean13, "wholesale_price": self.wholesale_price, "price": self.price }
+		return {"id":self.id, "id_product" : self.id_product, "reference" : self.reference, "ean13" : self.ean13, "wholesale_price": self.wholesale_price, "price": self.price, "mpn": self.mpn }
 
 	def __setstate__(self,dic):
 		""" Set the object state from unpickeling """
@@ -1961,6 +1961,7 @@ class CombinationData( BaseData ):
 		self.ean13 			= dic['ean13']
 		self.wholesale_price= dic['wholesale_price']
 		self.price			= dic['price']
+		self.mpn			= dic['mpn']
 
 	def canonical_reference( self ):
 		""" Return the canonical search string of the reference.
@@ -1985,13 +1986,14 @@ class ProductData( BaseData ):
 		advanced_stock_management(int) - 1/0 for advanced stock management
 		available_for_order(int)       - 1/0
 		ean13(str)	            - ean13 value when available
+		mpn(str)				- Manufacturer Part Number (can also be an EAN13)
 		upc(int)				- Universal Product Code, an integer that can be used for something else
 		weight(float)           - Product weight in Kg
 		id_tax_rules_group(int) - identification of the Rule taxe applying to the product
 
 	Remarks: directly loaded from by the product list class """
 
-	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "upc", "weight", "id_tax_rules_group","__vat_rate" ]
+	__slots__ = ["id", "active", "reference", "name", "wholesale_price", "price", "id_supplier", "id_category_default", "advanced_stock_management", "available_for_order", "ean13", "upc", "weight", "id_tax_rules_group","__vat_rate","mpn" ]
 
 	def __init__( self, owner ):
 		""" the owner is the PrestaHelper instance which create the
@@ -2000,6 +2002,7 @@ class ProductData( BaseData ):
 		super(ProductData,self).__init__(owner)
 		self.__vat_rate = None # Can be set with update_vat_rate (6,21,20.5)
 		self.upc = None
+		self.mpn = None
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an product """
@@ -2007,7 +2010,7 @@ class ProductData( BaseData ):
 
 	def __getstate__(self):
 		""" Return the object state for pickeling """
-		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight, "id_tax_rules_group" : self.id_tax_rules_group, "upc": self.upc }
+		return { "id":self.id, "active":self.active, "reference":self.reference , "name":self.name, "wholesale_price": self.wholesale_price, "price": self.price, "id_supplier" : self.id_supplier, "id_category_default" : self.id_category_default , "advanced_stock_management" : self.advanced_stock_management, "available_for_order" : self.available_for_order, "ean13" : self.ean13, "weight" : self.weight, "id_tax_rules_group" : self.id_tax_rules_group, "upc": self.upc, "mpn": self.mpn }
 
 	def __setstate__(self, dic):
 		""" Set the object state from unpickeling """
@@ -2025,10 +2028,14 @@ class ProductData( BaseData ):
 			self.ean13				  = dic['ean13']
 		else:
 			self.ean13				  = ''
-		if 'upc' in dic:
+		if ('upc' in dic) and (dic['upc']!=None):
 			self.upc 				  = int(dic['upc'])
 		else:
 			self.upc				  = None
+		if ('mpn' in dic) and (dic['mpn']!=None):
+			self.mpn                  = dic['mpn']
+		else:
+			self.mpn				  = ''
 		self.weight					  = dic['weight']
 		self.id_tax_rules_group		  = dic['id_tax_rules_group']
 
@@ -2212,6 +2219,7 @@ class CombinationList( BaseDataList ):
 			_data.id_product = int( item['id_product']['#text'] )
 			_data.reference  = item['reference'] if item['reference']!= None else ''
 			_data.ean13      = item['ean13'] if item['ean13']!=None else ''
+			_data.mpn 		 = item['mpn'] if item['mpn']!=None else ''
 			_data.wholesale_price = float( item['wholesale_price'] )
 			if( item['price'] == None ):
 				_data.price = 0
@@ -2283,6 +2291,8 @@ class BaseProductList( BaseDataList ):
 			_data.advanced_stock_management = int( item['advanced_stock_management'] )
 			_data.name     = extract_hashtext( item['name'] ) # ['language']['#text']
 			_data.reference= item['reference']
+			if _data.reference==None:
+				print( "BaseProductList: Product ID %i has no reference!" % _data.id )
 			_data.wholesale_price = float( item['wholesale_price'] )
 			if isinstance( item['id_supplier'], str ): # Not a valid reference
 				_data.id_supplier = PRESTA_UNDEFINE_INT
@@ -2297,6 +2307,7 @@ class BaseProductList( BaseDataList ):
 			else:
 				self.append( _data )
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
+			_data.mpn = item['mpn'] if item['mpn']!=None else ''
 			_data.upc   = int(item['upc'])   if item['upc']!=None else None
 			_data.weight = float(item['weight'])
 			# id_tax_rules_group may be defined as follow:
@@ -2333,6 +2344,7 @@ class BaseProductList( BaseDataList ):
 					_data = create_from_item( item )
 					_data.reference = _combination.reference
 					_data.ean13     = _combination.ean13
+					_data.mpn 		= _combination.mpn
 					_data.wholesale_price = _combination.wholesale_price
 					_data.price 		  = _combination.price
 					# recompute an unique id_product (1 for 99.999 products)
@@ -2479,6 +2491,8 @@ class BaseProductList( BaseDataList ):
 		_result = []
 		for item in self:
 			if item.ean13 == sEan:
+				_result.append( item )
+			elif (item.mpn!=None) and (item.mpn == sEan):
 				_result.append( item )
 		return _result
 

@@ -3,7 +3,7 @@
 #
 
 from prestaapi import PrestaHelper, CachedPrestaHelper, OrderStateList
-from output import PrestaOut
+from output import PrestaOut, SerialNumberLog
 from config import Config
 from pprint import pprint
 import logging
@@ -16,8 +16,8 @@ from xml.etree import ElementTree
 #
 from enum import Enum
 
-config = Config()
-h = CachedPrestaHelper( config.presta_api_url, config.presta_api_key, debug= False )
+#config = Config()
+#h = CachedPrestaHelper( config.presta_api_url, config.presta_api_key, debug= False )
 #print ("#products = %i" % ( len( h.products ) ) )
 
 class AppState( Enum ):
@@ -26,6 +26,7 @@ class AppState( Enum ):
 	WAIT_SHIPPING = 2
 	CONTROLED     = 3
 	APPEND_ORDER  = 4 # Wait state to append an order
+	WAIT_SERIAL   = 5 # Wait for Serial Number to be captured
 
 class CMD( Enum ):
 	RAW = 0
@@ -78,9 +79,14 @@ re_add_remove_several_id = re.compile( RE_ADD_REMOVE_SEVERAL_ID )
 
 class OrderShipApp():
 	def __init__( self ):
+		self.ID_SUPPLIER_PARAMS = None
 		self.config = Config()
 		self.h = CachedPrestaHelper( self.config.presta_api_url, self.config.presta_api_key, debug= False )
+		_item = self.h.suppliers.supplier_from_name( "PARAMS" )
+		if _item != None:
+			self.ID_SUPPLIER_PARAMS = _item.id
 		self.output = PrestaOut()
+		self.serials = SerialNumberLog()
 		self.state  = AppState.WAIT_ORDER
 		self.force_flag = False
 		# Loaded order
@@ -89,6 +95,7 @@ class OrderShipApp():
 		self.customer = None
 		self.carrier  = ''
 		self.shipping_number = ''
+
 		self.output.writeln( "Application initialized" )
 
 	def test_storage_paths( self ):
@@ -112,7 +119,7 @@ class OrderShipApp():
 			pass # don't raise error is path already exists
 		return os.path.exists( os.path.join(path, filename) )
 
-	def beep( self, success=False, notif=False ):
+	def beep( self, success=False, notif=False, serial_request=False ):
 		""" Rely of audio output to signal error """
 		#os.system( "mpg123 %s" % "error.mp3" )
 		_name = 'error.mp3'
@@ -120,7 +127,48 @@ class OrderShipApp():
 			_name = 'tada.mp3'
 		if notif:
 			_name = 'notif.mp3'
+		if serial_request:
+			_name = 'serial-request.mp3'
 		r_ = subprocess.Popen(['mpg123',_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE )
+
+	def get_product_params( self, id_product ):
+		""" Locate the product parameter stored in the PARAMS supplier reference for that product.
+			The PARAMS supplier is encoded as follows:     param1:value1,param2:value2 """
+
+		# If this special PARAMS supplier is not yet identified then
+		#   not possible to locate the special product parameter
+		#   stored there
+		if self.ID_SUPPLIER_PARAMS == None:
+			return {}
+
+		reference = self.h.product_suppliers.reference_for( id_product, self.ID_SUPPLIER_PARAMS )
+		# print( 'reference: %s' % reference )
+		if len(reference )==0:
+			return {}
+
+		result = {}
+		lst = reference.split(',')
+		for item in lst:
+			vals = item.split(':')
+			if len( vals )!= 2:
+				raise Exception( 'Invalid product PARAMS "%s" in "%s" for id_product %s. it must have 2 parts (colon separated!)' % (vals, reference,id_product) )
+			result[vals[0]] = vals[1]
+
+		return result
+
+	def get_product_param( self, id_product, param_name, as_bool=False, default=None ):
+		""" Return the value of a named parameter in the product PARAMS. Return the default value (None) is parameter is missing or not present.
+			:param id_product: the product for which the PARAMS must be look for.
+			:param param_name: the name of the parameter.
+			:param default: the default value if parameters are not present or param_name not present"""
+		_p = self.get_product_params( id_product )
+		if not(param_name in _p):
+			return default
+		if as_bool:
+			return _p[param_name] in ('1','Y','y')
+		else:
+			return _p[param_name]
+
 
 	def get_cmd( self, prompt='> ', debug=False ):
 		""" request an command. Return a tuple (cmd_type, cmd_texte) """
@@ -225,6 +273,7 @@ class OrderShipApp():
 		self.carrier  = ''
 		self.shipping_number = ''
 		self.force_flag = False
+		self.serials.reset()
 		self.output.reset_carbon_copy()
 		for i in range( 5 ):
 			print( " " ) # Do not register this message
@@ -241,7 +290,7 @@ class OrderShipApp():
 
 		cmd_type,cmd_data, cmd_mult = CMD.RAW, '', 1
 		while not((cmd_type==CMD.RAW) and (cmd_data.upper()=='EXIT')):
-			cmd_type,cmd_data,cmd_mult = self.get_cmd( prompt="%s: %-13s > "%(config.prompt ,AppState(self.state).name), debug=False)
+			cmd_type,cmd_data,cmd_mult = self.get_cmd( prompt="%s: %-13s > "%(self.config.prompt ,AppState(self.state).name), debug=False)
 
 			# -- Append extra info to CarbonCopy -------------------------------
 			# self.output.writeln( 'CMD: %s, %s, %s' % (cmd_type,cmd_data,cmd_mult) )
@@ -299,7 +348,11 @@ class OrderShipApp():
 
 			# -- Scan Product --------------------------------------------------
 			if (cmd_type == CMD.SCAN_PRODUCT):
-				if self.state != AppState.CONTROL_ORDER:
+				if self.state == AppState.WAIT_SERIAL:
+					self.output.writeln( '[ERROR] Product scan rejected!' )
+					self.output.writeln( '[ERROR] Expecting Serial Number for %s (%s)!' % ( _product.reference, _product.id_product) )
+					self.beep()
+				elif self.state != AppState.CONTROL_ORDER:
 					self.output.writeln("[ERROR] No order loaded")
 					self.beep()
 				else:
@@ -311,11 +364,35 @@ class OrderShipApp():
 							self.output.writeln( '[ERROR] %i * %s (%s) product CANNOT BE ADDED!' % (cmd_mult, _product.reference, _product.id_product) )
 							self.output.writeln( '[ERROR] Ordered: %i, Current Scan: %i' %(_product.ordered_qty,self.scan[_product.id_product]) )
 							self.beep()
+						elif ( abs(cmd_mult)>1 ) and ( get_product_param( _product.id_product, param_name='SN', default='N', as_bool=True )==True ):
+							self.output.writeln( '[ERROR] %i * %s (%s) multiple add forbid when SERIAL NUMBER must be captured!' % (cmd_mult, _product.reference, _product.id_product) )
+							self.output.writeln( '[ERROR] Ordered: %i, Current Scan: %i' %(_product.ordered_qty,self.scan[_product.id_product]) )
+							self.beep()
 						else:
 							self.scan[_product.id_product] = self.scan[_product.id_product] + cmd_mult
+							if self.get_product_param( _product.id_product, param_name='SN', default='N', as_bool=True ):
+								self.state = AppState.WAIT_SERIAL # We must also capture a serial number
+								# Capture Serial Number
+								self.output.writeln("Capture SERIAL NUMBER!")
+								self.beep( serial_request=True )
 					else:
 						self.output.writeln( "[ERROR] Product %s not in the order!" % cmd_data )
 						self.beep()
+				continue
+
+			# -- Capture Serial ------------------------------------------------
+			if (self.state == AppState.WAIT_SERIAL ):
+				if (cmd_type!=CMD.RAW):
+					self.output.writeln( '[ERROR] Expecting Serial Number for %s (%s)!' % ( _product.reference, _product.id_product) )
+					self.beep()
+				else:
+					# We have captured a serial information for a given product.
+					self.output.writeln(" SERIAL NUMBER = %s " % cmd_data )
+					self.serials.append( order=self.order, product=_product,
+						                 sn=cmd_data, remark=None )
+					# We can now return to control order state
+					self.state = AppState.CONTROL_ORDER
+
 				continue
 
 			# -- Append order --------------------------------------------------
@@ -414,6 +491,12 @@ class OrderShipApp():
 							self.beep()
 							continue
 					self.force_flag = False # Reset it
+					if len(self.serials) > 0:
+						self.output.writeln("")
+						self.output.writeln( '--- %i Serial Number(s) collected -----------------------------------------------' % len(self.serials) )
+						for sn in self.serials:
+							self.output.writeln( "  %-30s : %s" % ("%s (%4s)"%(sn.product_ref, sn.product_id), sn.sn ) )
+
 					self.output.writeln("")
 					self.output.writeln("ORDER ID %i CHECK SUCCESSFULLY" % self.order.id )
 					self.output.writeln("CUSTOMER       : %s" % self.customer.customer_name )
@@ -421,6 +504,8 @@ class OrderShipApp():
 					# Save the scan file.
 					_path, _filename = self.order_filename(self.order)
 					self.output.save_carbon_copy( os.path.join( _path, _filename ) )
+					# Export of serial number. Will be renamed .sn when imported into accounting
+					self.serials.save( os.path.join( _path, _filename.replace('.scan', '.sn_export') ) )
 					# Save all the joined order
 					for _joined_order in self.joined_order:
 						_joined_filename =  os.path.join( *(self.order_filename(_joined_order) ))
@@ -445,35 +530,35 @@ app.run()
 sys.exit(0)
 
 # Cmd de test 8042
-cmd_nr = raw_input( '#Commande: ' )
-if not cmd_nr.isdigit():
-   raise ValueError( '%s is not a number' % cmd_nr )
+#cmd_nr = raw_input( '#Commande: ' )
+#if not cmd_nr.isdigit():
+#   raise ValueError( '%s is not a number' % cmd_nr )
 
 
-orders = h.get_last_orders( int(cmd_nr), 1 )
-if len( orders ) <= 0:
-    raise ValueError( 'order %s not found' % cmd_nr )
+#orders = h.get_last_orders( int(cmd_nr), 1 )
+#if len( orders ) <= 0:
+#    raise ValueError( 'order %s not found' % cmd_nr )
 
-order = orders[0]
-customer = h.get_customer( order.id_customer )
-
-print( '--- Order ID : %i ---' % order.id )
-print( 'Shop ID      : %s' % order.id_shop )
+#order = orders[0]
+#customer = h.get_customer( order.id_customer )
+#
+#print( '--- Order ID : %i ---' % order.id )
+#print( 'Shop ID      : %s' % order.id_shop )
 # print( 'Carrier   ID : %i' % order.id_carrier )
 # print( 'current state: %i' % order.current_state )
 # print( 'Customer  ID : %i' % order.id_customer )
-print( 'Customer     : %s' % customer.customer_name )
-print( 'Cust.EMail   : %s' % customer.email )
-print( 'Carrier      : %s' % h.carriers.name_from_id( order.id_carrier ) )
-print( 'Current State: %s' % h.order_states.order_state_from_id( order.current_state ).name )
-print( 'valid        : %i' % order.valid )
-print( 'payment      : %s' % order.payment )
-print( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
-print( 'total Paid   : %.2f' % order.total_paid )
-print( 'Shipping Nr  : %s'   % order.shipping_number )
+#print( 'Customer     : %s' % customer.customer_name )
+#print( 'Cust.EMail   : %s' % customer.email )
+#print( 'Carrier      : %s' % h.carriers.name_from_id( order.id_carrier ) )
+#print( 'Current State: %s' % h.order_states.order_state_from_id( order.current_state ).name )
+#print( 'valid        : %i' % order.valid )
+#print( 'payment      : %s' % order.payment )
+#print( 'total HTVA   : %.2f' % order.total_paid_tax_excl )
+#print( 'total Paid   : %.2f' % order.total_paid )
+#print( 'Shipping Nr  : %s'   % order.shipping_number )
 # Content the order
-for row in order.rows:
-	print( row )
+#for row in order.rows:
+#	print( row )
 
 
 # Update the order current_status
@@ -490,7 +575,7 @@ order_current_state[0].text = str( OrderStateList.ORDER_STATE_SHIPPING )
       http://nullege.com/codes/show/src%40p%40r%40prestapyt-HEAD%40examples%40prestapyt_xml.py/22/prestapyt.PrestaShopWebService.edit/python
 """
 # Save the order
-print( 'post_order_data() call deactivated' )
+#print( 'post_order_data() call deactivated' )
 #h.post_order_data( int(cmd_nr), el_prestashop )
 
 #print( order_properties[0].tag )

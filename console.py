@@ -31,7 +31,7 @@ from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, Product
 from output import PrestaOut
 from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
-from pprint import pprint
+from pprint import pprint # Not required
 import logging
 import sys
 import signal
@@ -48,6 +48,7 @@ import cmd
 import sys
 import re
 import subprocess
+import prestaapi.prestaeditable as pe
 
 try:
 	from Tkinter import *
@@ -475,6 +476,7 @@ COMMANDS = [
 	('show product'   , 1   ),
 	('make transform' , 2   ),
 	('show stat'      , 0   ),
+	('update product' , '+'),
 	('upgrade'        , 0   )
 	]
 
@@ -549,6 +551,20 @@ class App( BaseApp ):
 			result[vals[0]] = vals[1]
 
 		return result
+
+	def get_product_param( self, id_product, param_name, as_bool=False, default=None ):
+		""" Return the value of a named parameter in the product PARAMS. Return the default value (None) is parameter is missing or not present.
+			:param id_product: the product for which the PARAMS must be look for.
+			:param param_name: the name of the parameter.
+			:param default: the default value if parameters are not present or param_name not present"""
+		_p = self.get_product_params( id_product )
+		if not(param_name in _p):
+			return default
+		if as_bool:
+			return _p[param_name] in ('1','Y','y')
+		else:
+			return _p[param_name]
+
 
 	def get_product_tariff( self, id_product ):
 		""" Locate the Tariff Code for the product stored into the TARIFF supplier reference for that product.
@@ -765,9 +781,7 @@ class App( BaseApp ):
 	#
 	# ---------------------------------------------------------------------------
 	def do_test( self, params ):
-		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID cmd'
-		_id = int( params[0] )
-
+		pass
 		# test_order_history( _id )
 		# self.test_save_order( 14286 ) # An order from Dominique
 		#self.cachedphelper.get_products( )
@@ -791,8 +805,9 @@ class App( BaseApp ):
 
 		#for item in self.cachedphelper.tax_rules:
 		#	print( item.id, item.id_tax, item.id_country, item.id_tax_rules_group );
-		for item in self.cachedphelper.tax_rule_groups:
-			print( item.id, item.name, item.active )
+		#for item in self.cachedphelper.tax_rule_groups:
+		#	print( item.id, item.name, item.active )
+
 
 	def save_shipping_nr( self, order_ids, shipping_nr ):
 		""" TEST: read, set status=Shipping, set Shipping_nr THEN save the order.
@@ -846,6 +861,42 @@ class App( BaseApp ):
 		print( ElementTree.tostring(_data) )
 		_data = self.cachedphelper.webservice.get( 'order_histories', 91241 )
 		print( ElementTree.tostring(_data) )
+
+	def do_update_product( self, params ):
+		""" update product ID_product --> shows XML
+		    update product ID_product date_add=value,param2=value,etc """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the parameter must be an ID product'
+		_id = int( params[0] )
+
+		# value setting
+		bUpdate = len(params)>1
+		if bUpdate:
+			pass
+
+		p = pe.ProductEditable( self.cachedphelper )
+		p.load( _id )
+		if not(bUpdate):
+			self.output.writeln( p.as_string )
+			return
+
+		# decode parameter
+		_dic = {}
+		for key,value in [ entry.split('=') for entry in params[1].split(",")]:
+			# Apply parameter
+			#print( 'parameter:', key, '=', value )
+			if key == 'date_add':
+				if value=="NOW":
+					p.date_add = datetime.datetime.now()
+				else:
+					# date at format
+					date_parts = value.split('/') #split format dd/mm/yyyy
+					p.date_add = datetime.datetime( int(date_parts[2]), int(date_parts[1]), int(date_parts[0]) )
+			else:
+				self.output.writeln( 'unsupported key %s (with value %s)' % (key,value) )
+				return -1
+
+		p.save()
+
 
 	def do_bag( self, params ):
 		""" View the content of the bag (shopping basket """
@@ -1969,6 +2020,7 @@ class App( BaseApp ):
 		self.output.writeln( 'Reference  : %s' % p.reference )
 		self.output.writeln( 'Name       : %s' % p.name )
 		self.output.writeln( 'EAN        : %s' % p.ean13 )
+		self.output.writeln( 'mpn        : %s' % p.mpn )
 		self.output.writeln( 'ID         : %s  (%s)' % (p.id, 'active' if p.active==1 else 'INACTIVE') )
 		self.output.writeln( 'P.A. (%%)   : %6.2f (%4.1f %% MARGIN rate)' %  (p.wholesale_price,_margin) )
 		self.output.writeln( 'P.V. (%%)   : %6.2f (%4.1f %% brand  rate)' %  (p.price, _marque ) )
@@ -1980,7 +2032,11 @@ class App( BaseApp ):
 		self.output.writeln( ' ' )
 		# If stock_available (only reloabale for basic product)
 		if _sa and not(is_combination(_id)):
-			self.output.writeln( 'Qty        : %i ' % _sa.quantity )
+			_qty = _sa.quantity
+		else:
+			_qty = -999
+		if _sa and not(is_combination(_id)):
+			self.output.writeln( 'Qty        : %i ' % _qty )
 			if _sa.depends_on_stock != _sa.DEPENDS_ON_STOCK_SYNCH:
 				self.output.writeln( 'Stock Synch: NOT SYNCH !!! (manual stock)' )
 			if _sa.out_of_stock == _sa.OUT_OF_STOCK_ACCEPT_ORDER:
@@ -1993,6 +2049,7 @@ class App( BaseApp ):
 		# PARAMS
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )
+		self.output.writeln( 'S/N status : %s' % ('have SERIAL NUMBER' if ('SN' in _p) and (_p['SN']=='Y') else 'no serial') )
 		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty >= 0 else '---') )
 		self.output.writeln( 'Weight     : %6.3f Kg' % p.weight )
 
@@ -2018,11 +2075,11 @@ class App( BaseApp ):
 				for line in transform.comments:
 					self.output.writeln( 'Remark: %s' % line )
 				self.output.writeln( "" )
-				self.output.writeln( "  : Movement                                : Remark                         : Stock")
-				self.output.writeln( "--:-----------------------------------------:--------------------------------:------")
+				self.output.writeln( "  : Movement                                : Remark                         : Stock :  Ref Four.")
+				self.output.writeln( "--:-----------------------------------------:--------------------------------:-------:------------")
 				item = transform.creating
-				self.output.writeln( "%-1s : %6.2f x %-30s : %-30s : see upper" % ('', item.required_qty, item.reference, item.comment) )
-				self.output.writeln( "--:-----------------------------------------:--------------------------------:------")
+				self.output.writeln( "%-1s : %6.2f x %-30s : %-30s : %5i :" % ('', item.required_qty, item.reference, item.comment, _qty) )
+				self.output.writeln( "--:-----------------------------------------:--------------------------------:-------:------------")
 
 				__pa_pricing = 0
 				for item in transform.sourcing:
@@ -2044,10 +2101,16 @@ class App( BaseApp ):
 						self.output.writeln('[ERROR] cannot find stock available for product %s (%i)' % (item.reference,_p.id))
 					if __qty_available < abs(item.required_qty):
 						__alert = '!'
+					# Supplier reference
+					if _p != None:
+						_supref = self.cachedphelper.product_suppliers.reference_for( _p.id, _p.id_supplier )
+					else:
+						_supref = ""
+
 					# Output the data
-					self.output.writeln( "%-1s : %6.2f x %-30s : %-30s : %5i" % (__alert, item.required_qty, item.reference, item.comment, __qty_available) )
+					self.output.writeln( "%-1s : %6.2f x %-30s : %-30s : %5i :  %s" % (__alert, item.required_qty, item.reference, item.comment, __qty_available,_supref) )
 				# Evaluate properly the __pa (because we can create multiple product from the transformation)
-				self.output.writeln( "--:-----------------------------------------:--------------------------------:------")
+				self.output.writeln( "--:-----------------------------------------:--------------------------------:------:------------")
 				self.output.writeln( 'Total PA/unit = %6.2f EUR' % (__pa_pricing/transform.creating.required_qty ))
 
 
@@ -2097,11 +2160,11 @@ class App( BaseApp ):
 
 		# List down the items
 		self.output.writeln( "" )
-		self.output.writeln( "  :Stock : Movement                                : Remark                         ")
-		self.output.writeln( "--:------:-----------------------------------------:--------------------------------")
+		self.output.writeln( "  :Stock : Movement                                : Remark                          : Ref Four")
+		self.output.writeln( "--:------:-----------------------------------------:---------------------------------:------------")
 
-		self.output.writeln( "%-1s : ---  : %6.2f x %-30s : %-30s :" % ('', item.required_qty, item.reference, item.comment) )
-		self.output.writeln( "--:------:-----------------------------------------:--------------------------------")
+		self.output.writeln( "%-1s : ---  : %6.2f x %-30s : %-30s  : " % ('', item.required_qty, item.reference, item.comment ) )
+		self.output.writeln( "--:------:-----------------------------------------:---------------------------------:------------")
 
 		for item in transform.sourcing:
 			__alert = ''
@@ -2121,10 +2184,15 @@ class App( BaseApp ):
 				self.output.writeln('[ERROR] cannot find stock available for product %s (%i)' % (item.reference,_p.id))
 			if __qty_available < abs(item.required_qty):
 				__alert = '!'
+			# Supplier reference
+			if _p != None:
+				_supref = self.cachedphelper.product_suppliers.reference_for( _p.id, _p.id_supplier )
+			else:
+				_supref = ""
 			# Output the data
-			self.output.writeln( "%-1s :%5i : %6.2f x %-30s : %-30s " % (__alert, __qty_available, item.required_qty, item.reference, item.comment) )
+			self.output.writeln( "%-1s :%5i : %6.2f x %-30s : %-31s :  %s " % (__alert, __qty_available, item.required_qty, item.reference, item.comment, _supref) )
 		# Evaluate properly the __pa (because we can create multiple product from the transformation)
-		self.output.writeln( "--:------:-----------------------------------------:--------------------------------")
+		self.output.writeln( "--:------:-----------------------------------------:---------------------------------:------------")
 
 
 	def do_set_debug( self, params ):
