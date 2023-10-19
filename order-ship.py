@@ -163,7 +163,10 @@ class OrderShipApp():
 			:param default: the default value if parameters are not present or param_name not present"""
 		_p = self.get_product_params( id_product )
 		if not(param_name in _p):
-			return default
+			if as_bool:
+				return False
+			else:
+				return default
 		if as_bool:
 			return _p[param_name] in ('1','Y','y')
 		else:
