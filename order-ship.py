@@ -142,7 +142,9 @@ class OrderShipApp():
 			return {}
 
 		reference = self.h.product_suppliers.reference_for( id_product, self.ID_SUPPLIER_PARAMS )
-		# print( 'reference: %s' % reference )
+		#print('id_product = %i' % id_product)
+		#print( 'ID_SUPPLIER_PARAMS = %i' %  self.ID_SUPPLIER_PARAMS )
+		#print( 'get_product_params: reference: %s' % reference )
 		if len(reference )==0:
 			return {}
 
@@ -158,7 +160,7 @@ class OrderShipApp():
 
 	def get_product_param( self, id_product, param_name, as_bool=False, default=None ):
 		""" Return the value of a named parameter in the product PARAMS. Return the default value (None) is parameter is missing or not present.
-			:param id_product: the product for which the PARAMS must be look for.
+			:param id_product: (int) the product for which the PARAMS must be look for.
 			:param param_name: the name of the parameter.
 			:param default: the default value if parameters are not present or param_name not present"""
 		_p = self.get_product_params( id_product )
@@ -367,13 +369,13 @@ class OrderShipApp():
 							self.output.writeln( '[ERROR] %i * %s (%s) product CANNOT BE ADDED!' % (cmd_mult, _product.reference, _product.id_product) )
 							self.output.writeln( '[ERROR] Ordered: %i, Current Scan: %i' %(_product.ordered_qty,self.scan[_product.id_product]) )
 							self.beep()
-						elif ( abs(cmd_mult)>1 ) and ( get_product_param( _product.id_product, param_name='SN', default='N', as_bool=True )==True ):
+						elif ( abs(cmd_mult)>1 ) and ( get_product_param( int(_product.id_product), param_name='SN', default='N', as_bool=True )==True ):
 							self.output.writeln( '[ERROR] %i * %s (%s) multiple add forbid when SERIAL NUMBER must be captured!' % (cmd_mult, _product.reference, _product.id_product) )
 							self.output.writeln( '[ERROR] Ordered: %i, Current Scan: %i' %(_product.ordered_qty,self.scan[_product.id_product]) )
 							self.beep()
 						else:
 							self.scan[_product.id_product] = self.scan[_product.id_product] + cmd_mult
-							if self.get_product_param( _product.id_product, param_name='SN', default='N', as_bool=True ):
+							if self.get_product_param( int(_product.id_product), param_name='SN', default='N', as_bool=True ):
 								self.state = AppState.WAIT_SERIAL # We must also capture a serial number
 								# Capture Serial Number
 								self.output.writeln("Capture SERIAL NUMBER!")
