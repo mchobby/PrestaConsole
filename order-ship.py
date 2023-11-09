@@ -369,7 +369,7 @@ class OrderShipApp():
 							self.output.writeln( '[ERROR] %i * %s (%s) product CANNOT BE ADDED!' % (cmd_mult, _product.reference, _product.id_product) )
 							self.output.writeln( '[ERROR] Ordered: %i, Current Scan: %i' %(_product.ordered_qty,self.scan[_product.id_product]) )
 							self.beep()
-						elif ( abs(cmd_mult)>1 ) and ( get_product_param( int(_product.id_product), param_name='SN', default='N', as_bool=True )==True ):
+						elif ( abs(cmd_mult)>1 ) and ( self.get_product_param( int(_product.id_product), param_name='SN', default='N', as_bool=True )==True ):
 							self.output.writeln( '[ERROR] %i * %s (%s) multiple add forbid when SERIAL NUMBER must be captured!' % (cmd_mult, _product.reference, _product.id_product) )
 							self.output.writeln( '[ERROR] Ordered: %i, Current Scan: %i' %(_product.ordered_qty,self.scan[_product.id_product]) )
 							self.beep()
