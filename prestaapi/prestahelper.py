@@ -119,6 +119,7 @@ class PrestaHelper(object):
 	   prestashop API"""
 	__prestashop = None
 	__prestashop_api_access = {'url' : None, 'key' : None }
+	prestashop_version = None
 
 	def __init__( self, presta_api_url, presta_api_key, debug = __debug__ ):
 		""" constructor with connection parameter to PrestaShop API. """
@@ -131,6 +132,7 @@ class PrestaHelper(object):
 
 		self.__debug = debug
 		self.__prestashop.debug = debug
+		self.prestashop_version = self.get_prestashop_version()
 
 	@property
 	def debug( self ):
@@ -170,6 +172,20 @@ class PrestaHelper(object):
 		  if not k.startswith('@'):
 			  _result[k] = v
 		return _result
+
+	def get_prestashop_version( self ):
+		""" retreive the PrestaShop PS_VERSION_DB from configuration """
+		# {'prestashop': {'configurations': {'configuration': {'id': '211', 'value': '1.7.8.7', 'name': 'PS_VERSION_DB'}}}}
+		el = self.__prestashop.search( 'configurations', options = {'display':'[id,name,value]', 'filter[name]': 'PS_VERSION_DB' } )
+		item = etree_to_dict( el )
+		_version = item['prestashop']['configurations']['configuration']['value']
+		return tuple( [int(_val) for _val in _version.split('.')] )
+
+	@property
+	def prestashop_version_nr( self ):
+		""" Return the version number as an integer value.
+		    ex: (1,6,3,23) --> 1.6.3.23 --> 106 """
+		return self.prestashop_version[0]*100 + self.prestashop_version[1]
 
 	def get_lastcustomermessage_id( self ):
 		""" Retreive the last customer message ID Stored into PrestaShop"""
@@ -320,6 +336,15 @@ class PrestaHelper(object):
 		_result.load_from_xml( el )
 		return _result
 
+	def get_configurations( self ):
+		logging.debug( 'read configurations')
+		el = self.__prestashop.search( 'configurations', options = {'display':'[id,name,value]'} ) # date_add, date_upd
+
+		_result = ConfigurationList( self )
+		# save_to_file('configurations', el )
+		_result.load_from_xml( el )
+		return _result
+
 	def get_tax_rate( self, id_tax_rule_group, country_iso ):
 		""" Products does not have Tax_id but Tax_Rule_Group + Country for which we do need it. """
 		# Optimize: if already search and found -> Return it qwickly
@@ -353,7 +378,10 @@ class PrestaHelper(object):
 		""" retreive a list of products from PrestaShop """
 		# combinations are used to create the various "declinaisons" of a single product
 		logging.debug( 'read combinations' )
-		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price,weight,mpn]' } ) # read mpn?
+		# Does it have ManufacturerPartNumber ???
+		_version = self.prestashop_version[0]*100+self.prestashop_version[1] # ex: (1,6,3,23) --> 1.6.3.23 --> 106
+		has_mpn = _version > 106
+		el = self.__prestashop.search( 'combinations', options = {'display' : '[id,id_product,reference, ean13,wholesale_price,price,weight%s]' % (',mpn' if has_mpn else '') } ) # read mpn?
 		_combinations = CombinationList( self )
 		#save_to_file( 'get_products_combinations', el )
 		_combinations.load_from_xml( el )
@@ -361,7 +389,7 @@ class PrestaHelper(object):
 		logging.debug( 'read products' )
 		#print( ElementTree.tostring( el ) )
 
-		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,upc,weight,id_tax_rules_group,mpn]'} )
+		el = self.__prestashop.search( 'products', options = {'display': '[id,reference,active,name,price,wholesale_price,id_supplier,id_category_default,advanced_stock_management,available_for_order,ean13,upc,weight,id_tax_rules_group%s]'  % (',mpn' if has_mpn else '') } )
 		# save_to_file( 'get_products', el )
 		#print( ElementTree.tostring( el ) )
 
@@ -666,7 +694,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 9
+	CACHE_FILE_VERSION = 10
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -681,6 +709,7 @@ class CachedPrestaHelper( PrestaHelper ):
 	__category_list = None
 	__stock_available_list = None
 	__product_supplier_list = None
+	__configuration_list = None
 
 	def __init__( self, presta_api_url, presta_api_key, debug = __debug__, progressCallback = None  ):
 		""" constructor with connection parameter to PrestaShop API.
@@ -702,29 +731,33 @@ class CachedPrestaHelper( PrestaHelper ):
 	def load_from_webshop( self ):
 		""" Load the cache with data cominf from the WebShop """
 		logging.info( 'Init cache from WebShop' )
-		__MAX_STEP = 11
+		__MAX_STEP = 12
 
-		self.fireProgress( 1, __MAX_STEP, 'Caching Carriers...' )
+		self.fireProgress( 1, __MAX_STEP, 'Caching configuration...' )
+		self.__configuration_list = self.get_configurations()
+		self.fireProgress( 1, __MAX_STEP, 'Prestashop version: %r' % (self.prestashop_version,) )
+		# self.fireProgress( 1, __MAX_STEP, 'Prestashop DB ver.: %s' % self.__configuration_list.prestashop_version_db )
+		self.fireProgress( 2, __MAX_STEP, 'Caching Carriers...' )
 		self.__carrier_list = self.get_carriers()
-		self.fireProgress( 2, __MAX_STEP, 'Caching Order states...' )
+		self.fireProgress( 3, __MAX_STEP, 'Caching Order states...' )
 		self.__order_state_list = self.get_order_states()
-		self.fireProgress( 3, __MAX_STEP, 'Caching Products...' )
+		self.fireProgress( 4, __MAX_STEP, 'Caching Products...' )
 		self.__product_list = self.get_products()
-		self.fireProgress( 4, __MAX_STEP, 'Caching Suppliers...' )
+		self.fireProgress( 5, __MAX_STEP, 'Caching Suppliers...' )
 		self.__supplier_list = self.get_suppliers()
-		self.fireProgress( 5, __MAX_STEP, 'Caching Categories...' )
+		self.fireProgress( 6, __MAX_STEP, 'Caching Categories...' )
 		self.__category_list = self.get_categories()
-		self.fireProgress( 6, __MAX_STEP, 'Caching Stock Availables...' )
+		self.fireProgress( 7, __MAX_STEP, 'Caching Stock Availables...' )
 		self.__stock_available_list = self.get_stockavailables()
-		self.fireProgress( 7, __MAX_STEP, 'Caching Product Suppliers...' )
+		self.fireProgress( 8, __MAX_STEP, 'Caching Product Suppliers...' )
 		self.__product_supplier_list = self.get_product_suppliers()
-		self.fireProgress( 8, __MAX_STEP, 'Caching Countries...' )
+		self.fireProgress( 9, __MAX_STEP, 'Caching Countries...' )
 		self.__country_list = self.get_countries()
-		self.fireProgress( 9, __MAX_STEP, 'Caching Taxes...' )
+		self.fireProgress( 10, __MAX_STEP, 'Caching Taxes...' )
 		self.__tax_list = self.get_taxes()
-		self.fireProgress( 10, __MAX_STEP, 'Caching Tax Rules...' )
+		self.fireProgress( 11, __MAX_STEP, 'Caching Tax Rules...' )
 		self.__tax_rule_list = self.get_tax_rules()
-		self.fireProgress( 11, __MAX_STEP, 'Caching Tax Rule Groups...' )
+		self.fireProgress( 12, __MAX_STEP, 'Caching Tax Rule Groups...' )
 		self.__tax_rule_group_list = self.get_tax_rule_groups()
 
 		# Languages are not pickled yet
@@ -774,6 +807,7 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__tax_rule_list.unpickle_data( fh )
 			self.__tax_rule_group_list = TaxRuleList( self )
 			self.__tax_rule_group_list.unpickle_data( fh )
+			self.__configuration_list.unpickle_data( fh )
 
 			return True
 		except StandardError, error:
@@ -802,6 +836,7 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__tax_list.pickle_data( fh )
 			self.__tax_rule_list.pickle_data( fh )
 			self.__tax_rule_group_list.pickle_data( fh )
+			self.__configuration_list.pickle_data( fh )
 		finally:
 			fh.close()
 
@@ -944,6 +979,11 @@ class CachedPrestaHelper( PrestaHelper ):
 	def stock_availables( self ):
 		""" Return the stock availables """
 		return self.__stock_available_list
+
+	@property
+	def configurations( self ):
+		""" Return the configurations """
+		return self.__configuration_list
 
 class BaseData( object ):
 	""" Base class for data object... having a reference to the helper """
@@ -1522,6 +1562,50 @@ class TaxRuleGroupList( BaseDataList ):
 		for item in self:
 			if item.id == Id:
 				return item
+		return None
+
+class ConfigurationData( BaseData ):
+	""" Contains the Configuration Information Data """
+	__slots__ = ["id", "name", "value" ]
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the ConfigurationList """
+		pass
+
+	def __getstate__(self):
+		""" return the current state of the object for pickeling """
+		return {'id':self.id, 'name':self.name, 'value':self.value }
+
+	def __setstate__(self, dic ):
+		""" set the current state of object from dic parameter """
+		self.id = dic['id']
+		self.name  = dic['name' ]
+		self.value = dic['value' ]
+
+	def __repr__( self ):
+		return "<%s %s = %r>" % (self.__class__.__name__, self.name, self.value )
+
+class ConfigurationList( BaseDataList ):
+	""" List of Configurations """
+
+	# used to store inactive supplier objects
+	def load_from_xml( self, node ):
+		""" Load the configuration list with data comming from prestashop search.
+			Must contains nodes: id, name, value """
+		items = etree_to_dict( node )
+		items = items['prestashop']['configurations']['configuration']
+		for item in items:
+			_data = ConfigurationData( self.helper )
+			_data.id      = int( item['id'] )
+			_data.name    = item['name']
+			_data.value   = item['value']
+			self.append( _data )
+
+	def value_of( self, name ):
+		""" Return the ConfigurationData object from Name """
+		for item in self:
+			if item.name == name:
+				return item.value
 		return None
 
 
@@ -2219,7 +2303,10 @@ class CombinationList( BaseDataList ):
 			_data.id_product = int( item['id_product']['#text'] )
 			_data.reference  = item['reference'] if item['reference']!= None else ''
 			_data.ean13      = item['ean13'] if item['ean13']!=None else ''
-			_data.mpn 		 = item['mpn'] if item['mpn']!=None else ''
+			if self.helper.prestashop_version_nr > 106:
+				_data.mpn 	 = item['mpn'] if item['mpn']!=None else ''
+			else:
+				_data.mpn    = ''
 			_data.wholesale_price = float( item['wholesale_price'] )
 			if( item['price'] == None ):
 				_data.price = 0
@@ -2276,6 +2363,7 @@ class BaseProductList( BaseDataList ):
 		"""
 		super(BaseProductList,self).__init__(owner)
 		self.combinationlist = combinationlist
+		self.has_mpn = owner.prestashop_version_nr > 106
 
 	def load_from_xml( self, node ):
 		""" Load the Product list with data comming from prestashop search.
@@ -2307,7 +2395,10 @@ class BaseProductList( BaseDataList ):
 			else:
 				self.append( _data )
 			_data.ean13 = item['ean13'] if item['ean13']!=None else ''
-			_data.mpn = item['mpn'] if item['mpn']!=None else ''
+			if self.has_mpn:
+				_data.mpn = item['mpn'] if item['mpn']!=None else ''
+			else:
+				_data.mpn = ''
 			_data.upc   = int(item['upc'])   if item['upc']!=None else None
 			_data.weight = float(item['weight'])
 			# id_tax_rules_group may be defined as follow:
