@@ -49,6 +49,9 @@ class BatchData( object ):
 		self.label_count       = 0 # Number of printeed label
 		self.info              = ''
 
+	def __repr__( self ):
+		return "<%s %s for %s @ %s>" % (self.__class__.__name__, self.batch_id, self.product_reference, self.expiration )
+
 	def save_in_section( self, section_name, config ):
 		""" Save the data into a ConfigParser.section """
 		config.set( section_name, 'batch_id'         , str( self.batch_id ) )
@@ -110,6 +113,9 @@ class Batch( object ):
 	def __init__( self ):
 		self.data = BatchData()
 		self.transformations = []
+
+	def __repr__( self ):
+		return '<%s %r + transformations %r' % (self.__class__.__name__, self.data, self.transformations )
 
 	def add_transformation( self ):
 		_r = TransformationData()

@@ -124,6 +124,14 @@ bag import :
 
   Reimport the XML file into the bag.
 
+batch expire <thresold_months>
+	alias: ebatch
+	List all products ins stock having a peremption period <= 3 months when
+	<thresold_months> is omitted.
+	When <thresold_months> (number) is used, the report use it to list down
+	the products about to expire in that period of time.
+
+	batch expire 6  --> list the products about to expire within the 6 next months.
 
 batch new <ID>:
   alias: nbatch

@@ -430,7 +430,7 @@ COMMANDS = [
 	('batch print'    , 1   ),
 	('batch transform', 1   ),
 	('batch list'     , '*' ),
-	('batch expire'   , 0   ),
+	('batch expire'   , '*' ),
 	('batch view'     , 1   ),
 	('batch load'     , 1   ),
 	('batch search'   , '+' ),
@@ -1314,139 +1314,148 @@ class App( BaseApp ):
 		for line in self.batches.as_text( batch_id ):
 			self.output.writeln( line )
 
-		def do_batch_load( self, params ):
-			""" For debugging purpose: just load a given batch """
-			assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the batch_id must be an integer'
-			batch_id = int(params[0])
-			self.output.writeln( 'stored @ %s' % self.batches.batch_filename(batch_id) )
-			_batch = self.batches.load_batch( batch_id )
-			self.output.writeln( 'batch %i loaded' % batch_id )
-			print( _batch )
-			print( _batch.has_transformation( 274501256 ))
+	def do_batch_load( self, params ):
+		""" For debugging purpose: just load a given batch """
+		assert len(params)>0 and isinstance( params[0], str ) and params[0].isdigit(), 'the batch_id must be an integer'
+		batch_id = int(params[0])
+		self.output.writeln( 'stored @ %s' % self.batches.batch_filename(batch_id) )
+		_batch = self.batches.load_batch( batch_id )
+		self.output.writeln( 'batch %i loaded' % batch_id )
+		print( _batch )
+		print( _batch.has_transformation( 274501256 ))
 
-		def do_batch_expire( self, params ):
-			""" Search for a product having stock and an bathces about to expires. """
-			#assert len(params)>0 and isinstance( params[0], str ), 'the parameter must be a string'
-			#key = params[0]
+	def do_batch_expire( self, params ):
+		""" Search for a product having stock and an bathces about to expires. """
+		#assert len(params)>0 and isinstance( params[0], str ), 'the parameter must be a string'
+		#key = params[0]
+		thresold_months = 3
+		if len(params)>0:
+			thresold_months = int(params[0])
+		self.output.writeln( u"Thresold: %i months" % thresold_months )
 
-			thresold_months = 3
 
-			# Search all product
-			products = self.cachedphelper.search_products_from_partialref( '', include_inactives = True )
+		# Search all product
+		products = self.cachedphelper.search_products_from_partialref( '', include_inactives = False )
 
-			show_IT_product = self.options['include-it'] == '1'
-			show_inactive   = self.options['inactive-product'] == '1'
-			# Remove item that are ITs
-			if not( show_IT_product ):
-				products.filter_out( lambda psr: psr.product_data.is_IT )
-			# Remove item that are inactive (but preserve ITs which are always inactives)
-			if not( show_inactive ):
-				products.filter_out( lambda psr: psr.product_data.active==0  and not(psr.product_data.is_IT) )
-			# Remove item that are out of Stock
-			products.filter_out( lambda psr : psr.qty <= 0 )
+		show_IT_product = self.options['include-it'] == '1'
+		show_inactive   = self.options['inactive-product'] == '1'
+		# Remove item that are ITs
+		products.filter_out( lambda psr: psr.product_data.is_IT )
+		# Remove item that are inactive (but preserve ITs which are always inactives)
+		products.filter_out( lambda psr: psr.product_data.active==0  and not(psr.product_data.is_IT) )
+		# Remove item that are out of Stock
+		products.filter_out( lambda psr : psr.qty <= 0 )
 
-			batches = []
-			batch_id = self.batches.last_batch_id()
-			self.output.writeln( u"Loading batches from %i ..." % batch_id )
-			while batch_id >= 0:
+		batches = []
+		batch_id = self.batches.last_batch_id()
+		self.output.writeln( u"Loading batches from %i ..." % batch_id )
+		while batch_id >= 0:
+			try:
+				_batch = self.batches.load_batch( batch_id )
+				batches.append( _batch )
+			except EBatch as err:
+				# Loading error are just reported
+				self.output.writeln( u"%s" % err ) # Must be unicode
+				continue
+			finally:
+				batch_id -= 1
+
+		# self.output_product_search_result( psr_list = products )
+		class ExpirationData:
+			__slots__ = ['product_id', 'batch_id', 'batch_obj', 'qty', 'expiration', 'expmonths' 'transfo']
+
+			def __init__( self, product_id, batch_id, batch_obj, qty, expiration, transfo ):
+				self.product_id = product_id
+				self.batch_id   = batch_id
+				self.batch_obj  = batch_obj
+				self.qty        = qty
+				self.expiration = expiration # String as known inside batch
+				self.expmonths   = 0
+				self.transfo    = transfo    # True when the entry concerns a batch transformation
+				# Calculate expiration in month from the year 0000
 				try:
-					_batch = self.batches.load_batch( batch_id )
-					batches.append( _batch )
-				except EBatch as err:
-					# Loading error are just reported
-					self.output.writeln( u"%s" % err ) # Must be unicode
-					continue
-				finally:
-					batch_id -= 1
+					m,y = expiration.split('/')
+					self.expmonths   = int(y)*12 + int(m)
+				except:
+					self.expmonths   = -999
 
-			# self.output_product_search_result( psr_list = products )
-			class ExpirationData:
-				__slots__ = ['product_id', 'batch_id', 'batch_obj', 'qty', 'expiration', 'expmonths' 'transfo']
-
-				def __init__( self, product_id, batch_id, batch_obj, qty, expiration, transfo ):
-					self.product_id = product_id
-					self.batch_id   = batch_id
-					self.batch_obj  = batch_obj
-					self.qty        = qty
-					self.expiration = expiration # String as known inside batch
-					self.expmonths   = 0
-					self.transfo    = transfo    # True when the entry concerns a batch transformation
-					# Calculate expiration in month from the year 0000
-					try:
-						m,y = expiration.split('/')
-						self.expmonths   = int(y)*12 + int(m)
-					except:
-						self.expmonths   = -999
-
-				def __repr__( self ):
-					return "<ExpirationData Batch %i for product_id %i. Expire @ %s for %i items>" % (self.batch_id, self.product_id, self.expiration, self.qty )
+			def __repr__( self ):
+				return "<ExpirationData Batch %i for product_id %i. Expire @ %s for %i items>" % (self.batch_id, self.product_id, self.expiration, self.qty )
 
 
-			expirations = {} # dic of batch expirations data for the product_id, [list of ExpirationData]
+		expirations = {} # dic of batch expirations data for the product_id, [list of ExpirationData]
 
-			for product in products:
-				_expire_list = []
-				qty = product.qty
+		self.output.writeln( u"Computing ..."  )
+		for product in products:
+			_expire_list = []
+			qty = product.qty
 
-				# Collect Batches for that product_id
-				prod_batches = [_batch for _batch in batches if int(_batch.data.product_id) == product.product_data.id ]
-				# Collect last batches covering the quantity
-				for prod_batch in prod_batches:
-					_expire_list.append( ExpirationData( product.product_data.id,
-															prod_batch.data.batch_id,
-															prod_batch,
-															prod_batch.data.label_count,
-															prod_batch.data.expiration,
-															False ) ) # It is not a transformation
-					qty -= int(prod_batch.data.label_count)
+			# Collect Batches for that product_id or
+			#         Batches having a transformation for that product_id
+			#prod_batches = [_batch for _batch in batches if int(_batch.data.product_id) == product.product_data.id ]
+			prod_batches = []
+			for _batch in batches:
+				if int(_batch.data.product_id) == product.product_data.id:
+					prod_batches.append(_batch)
+				elif _batch.has_transformation( product.product_data.id ):
+					prod_batches.append(_batch)
+
+			# Now review the identified batch and start decounting the quantities!
+			for _batch in prod_batches:
+				# IF the Batch directly concerns the Product
+				# ... collect last batches covering the quantity
+				if int(_batch.data.product_id) == product.product_data.id:
 					if qty <= 0:
 						break
+					_expire_list.append( ExpirationData( product.product_data.id,
+															_batch.data.batch_id,
+															_batch,
+															_batch.data.label_count,
+															_batch.data.expiration,
+															False ) ) # It is not a transformation
+					qty -= int(_batch.data.label_count)
 
-				if qty > 0:
-					prod_transfos = [ _batch for _batch in batches if _batch.has_transformation( product.product_data.id ) ]
-					for prod_transfo in prod_transfos:
-						if qty <= 0:
-							break
+				# ELSE one of the TRANSFORMATION concerns the product
+				for _transform in _batch.transformations:
+					if int(_transform.target_product_id) != product.product_data.id:
+						continue
+					if qty <= 0:
+						break
+					_expire_list.append( ExpirationData( product.product_data.id,
+										_batch.data.batch_id,
+										_batch,
+										_transform.label_count,
+										_transform.expiration,
+										True ) ) # It is from transformation
+					qty -= int(_transform.label_count)
 
-						for transformation in prod_transfo.transformations:
-							# Does the transformation concerns my product ?
-							if int(transformation.target_product_id) != product.product_data.id :
-								continue
-							_expire_list.append( ExpirationData( product.product_data.id,
-																	prod_transfo.data.batch_id,
-																	prod_transfo,
-																	transformation.label_count,
-																	transformation.expiration,
-																	True ) ) # It is from transformation
-							qty -= int(transformation.label_count)
-							if qty <= 0:
-								break
-				#print( product.product_data.id, _expire_list )
-				# Store the data (duplicate it)
-				expirations[int(product.product_data.id)] = list( _expire_list )
 
-			# Now, check the expiration
-			line = 0
-			today = datetime.date.today()
-			months = today.year*12 + today.month # Today in month
-			self.output.writeln( '%15s | %-40s | %5s | %s ' % ('Product', 'Reference', 'Qty', 'Batch Expire Info' ) )
-			self.output.writeln( '-'*100 )
-			for product in products:
-				sExpireInfo = ''
-				if not int(product.product_data.id) in expirations:
-					sExpireInfo = 'Missing batch expiration'
-				else:
-					for expiration in expirations[ int(product.product_data.id) ]:
-						_exp = expiration.expmonths - months
-						if _exp <= thresold_months:
-							sExpireInfo += '%s @ %i items = %i mois, ' % (expiration.batch_id,  expiration.qty , _exp)
+			# Store the data (duplicate it)
+			expirations[int(product.product_data.id)] = list( _expire_list )
+			#print( product.product_data.id, _expire_list )
 
-				if len(sExpireInfo) > 0:
-					self.output.writeln( u"%15i | %-40s | %5i | %s " % (product.product_data.id, product.product_data.reference, product.qty, sExpireInfo) )
-					line += 1
+		# Now, check the expiration
+		line = 0
+		today = datetime.date.today()
+		months = today.year*12 + today.month # Today in month
+		self.output.writeln( '%15s | %-40s | %5s | %s ' % ('Product', 'Reference', 'Qty', 'Batch Expire Info' ) )
+		self.output.writeln( '-'*100 )
+		for product in products:
+			sExpireInfo = ''
+			if not int(product.product_data.id) in expirations:
+				sExpireInfo = 'Missing batch expiration'
+			else:
+				for expiration in expirations[ int(product.product_data.id) ]:
+					_exp = expiration.expmonths - months
+					if _exp <= thresold_months:
+						sExpireInfo += '%s @ %i items = %i mois, ' % (expiration.batch_id,  expiration.qty , _exp)
 
-			self.output.writeln( '%i rows in result' % line)
-			return True
+			if len(sExpireInfo) > 0:
+				self.output.writeln( u"%15i | %-40s | %5i | %s " % (product.product_data.id, product.product_data.reference, product.qty, sExpireInfo) )
+				line += 1
+
+		self.output.writeln( '%i rows in result' % line)
+		return True
 
 	def do_batch_search( self, params ):
 		""" Search in the batch for a string (given in parameter). The second parameter is the the search length"""
