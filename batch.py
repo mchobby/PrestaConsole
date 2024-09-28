@@ -48,6 +48,7 @@ class BatchData( object ):
 		self.expiration        = None # 'mm/yyyy'
 		self.label_count       = 0 # Number of printeed label
 		self.info              = ''
+		self.loc               = ''
 
 	def __repr__( self ):
 		return "<%s %s for %s @ %s>" % (self.__class__.__name__, self.batch_id, self.product_reference, self.expiration )
@@ -63,6 +64,7 @@ class BatchData( object ):
 		config.set( section_name, 'expiration'		 , self.expiration  ) # 'mm/yyyy'
 		config.set( section_name, 'label_count'		 , str( self.label_count ) ) # Number of printeed label
 		config.set( section_name, 'info'			 , self.info )
+		config.set( section_name, 'loc'              , self.loc )
 
 	def load_from_section( self, section_name, config ):
 		""" reload the data from a ConfigParser.section """
@@ -75,6 +77,10 @@ class BatchData( object ):
 		self.expiration  = config.get( section_name, 'expiration'		  ) # 'mm/yyyy'
 		self.label_count = int( config.get( section_name, 'label_count'	) ) # Number of printeed label
 		self.info        = config.get( section_name, 'info'	 )
+		try:
+			self.loc = config.get( section_name, 'loc' )
+		except:
+			self.loc = '-' # No localisation in older batches
 
 class TransformationData( object ):
 	def __init__( self ):

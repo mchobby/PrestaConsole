@@ -69,12 +69,12 @@ def extract_hashtext( item, default_lang_id='2' ):
 		for label_dic in item['language']:
 			if label_dic['@id'] == default_lang_id:
 				if '#text' in label_dic: # cover strange case: {'language': {'@id': '2'}
-					return label_dic['#text']
+					return label_dic['#text'].encode('UTF8')
 				else:
 					return ''
 	else:
 		if '#text' in item['language']:
-			return item['language']['#text']
+			return item['language']['#text'].encode('UTF8')
 		else:
 			return ''
 
@@ -186,6 +186,24 @@ class PrestaHelper(object):
 		""" Return the version number as an integer value.
 		    ex: (1,6,3,23) --> 1.6.3.23 --> 106 """
 		return self.prestashop_version[0]*100 + self.prestashop_version[1]
+
+	def get_laststockmovement_id( self ):
+		""" Retreive the last Stock Movement ID Stored into PrestaShop"""
+		el = self.__prestashop.search( 'stock_movements', options={'limit':1, 'sort' : 'id_DESC'} )
+		item = etree_to_dict( el )
+		# print( item )
+		return int( item['prestashop']['stock_mvts']['stock_mvt']['@id'] )
+
+	def get_stock_movements( self, from_id, count ):
+		logging.debug( 'read stock movements' )
+		count=2
+		el = self.__prestashop.search( 'stock_movements', options={'display':'[id,id_employee,id_stock,id_stock_mvt_reason,id_order,physical_quantity,sign,date_add]','limit':count, 'sort' : 'id_DESC', 'filter[id]': '<=[%i]' % from_id} )
+		item = etree_to_dict( el )
+		print( item )
+		# 'products', options = {'display':'[id,description]', 'filter[id]': '[%i]' % id_product } )
+		_r = MovementList( self )
+		_r.load_from_xml( el )
+		return _r
 
 	def get_lastcustomermessage_id( self ):
 		""" Retreive the last customer message ID Stored into PrestaShop"""
@@ -336,6 +354,15 @@ class PrestaHelper(object):
 		_result.load_from_xml( el )
 		return _result
 
+	def get_movement_reasons( self ):
+		logging.debug( 'read movement_reasons')
+		el = self.__prestashop.search( 'stock_movement_reasons', options = {'display':'[id,sign,name]'} ) # date_add, date_upd
+
+		_result = MovementReasonList( self )
+		# save_to_file('movement_reasons', el )
+		_result.load_from_xml( el )
+		return _result
+
 	def get_configurations( self ):
 		logging.debug( 'read configurations')
 		el = self.__prestashop.search( 'configurations', options = {'display':'[id,name,value]'} ) # date_add, date_upd
@@ -396,6 +423,13 @@ class PrestaHelper(object):
 		_result = BaseProductList( self, _combinations if len(_combinations)>0 else None )
 		_result.load_from_xml( el )
 
+		return _result
+
+	def get_product_locations( self ):
+		logging.debug( 'read product locations' )
+		el = self.__prestashop.search( 'warehouse_product_locations', options = {'display': '[id,id_product,id_product_attribute,id_warehouse,location]'} )
+		_result = ProductLocationList( self )
+		_result.load_from_xml( el )
 		return _result
 
 	def get_suppliers( self ):
@@ -694,7 +728,7 @@ class ProductSearchResult( object ):
 
 class CachedPrestaHelper( PrestaHelper ):
 	""" PrestaHelper class that permamently cache some useful information """
-	CACHE_FILE_VERSION = 10
+	CACHE_FILE_VERSION = 11
 	CACHE_FILE_NAME    = 'cachefile.pkl'
 	CACHE_FILE_DATETIME= None
 
@@ -705,11 +739,13 @@ class CachedPrestaHelper( PrestaHelper ):
 	__tax_rule_group_list = None
 	__order_state_list = None
 	__product_list = None
+	__product_location_list = None
 	__supplier_list = None
 	__category_list = None
 	__stock_available_list = None
 	__product_supplier_list = None
 	__configuration_list = None
+	__movement_reason_list = None
 
 	def __init__( self, presta_api_url, presta_api_key, debug = __debug__, progressCallback = None  ):
 		""" constructor with connection parameter to PrestaShop API.
@@ -731,7 +767,7 @@ class CachedPrestaHelper( PrestaHelper ):
 	def load_from_webshop( self ):
 		""" Load the cache with data cominf from the WebShop """
 		logging.info( 'Init cache from WebShop' )
-		__MAX_STEP = 12
+		__MAX_STEP = 14
 
 		self.fireProgress( 1, __MAX_STEP, 'Caching configuration...' )
 		self.__configuration_list = self.get_configurations()
@@ -743,23 +779,27 @@ class CachedPrestaHelper( PrestaHelper ):
 		self.__order_state_list = self.get_order_states()
 		self.fireProgress( 4, __MAX_STEP, 'Caching Products...' )
 		self.__product_list = self.get_products()
-		self.fireProgress( 5, __MAX_STEP, 'Caching Suppliers...' )
+		self.fireProgress( 5, __MAX_STEP, 'Caching Product Locations...' )
+		self.__product_location_list = self.get_product_locations()
+		self.fireProgress( 6, __MAX_STEP, 'Caching Suppliers...' )
 		self.__supplier_list = self.get_suppliers()
-		self.fireProgress( 6, __MAX_STEP, 'Caching Categories...' )
+		self.fireProgress( 7, __MAX_STEP, 'Caching Categories...' )
 		self.__category_list = self.get_categories()
-		self.fireProgress( 7, __MAX_STEP, 'Caching Stock Availables...' )
+		self.fireProgress( 8, __MAX_STEP, 'Caching Stock Availables...' )
 		self.__stock_available_list = self.get_stockavailables()
-		self.fireProgress( 8, __MAX_STEP, 'Caching Product Suppliers...' )
+		self.fireProgress( 9, __MAX_STEP, 'Caching Product Suppliers...' )
 		self.__product_supplier_list = self.get_product_suppliers()
-		self.fireProgress( 9, __MAX_STEP, 'Caching Countries...' )
+		self.fireProgress( 10, __MAX_STEP, 'Caching Countries...' )
 		self.__country_list = self.get_countries()
-		self.fireProgress( 10, __MAX_STEP, 'Caching Taxes...' )
+		self.fireProgress( 11, __MAX_STEP, 'Caching Taxes...' )
 		self.__tax_list = self.get_taxes()
-		self.fireProgress( 11, __MAX_STEP, 'Caching Tax Rules...' )
+		self.fireProgress( 12, __MAX_STEP, 'Caching Tax Rules...' )
 		self.__tax_rule_list = self.get_tax_rules()
-		self.fireProgress( 12, __MAX_STEP, 'Caching Tax Rule Groups...' )
+		self.fireProgress( 13, __MAX_STEP, 'Caching Tax Rule Groups...' )
 		self.__tax_rule_group_list = self.get_tax_rule_groups()
-
+		self.fireProgress( 14, __MAX_STEP, 'Caching Movement Reasons...' )
+		self.__movement_reason_list = self.get_movement_reasons()
+		
 		# Languages are not pickled yet
 		# self.fireProgress( 8, __MAX_STEP, 'Caching languages...' )
 		# self.__language_list = self.get_languages()
@@ -808,6 +848,8 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__tax_rule_group_list = TaxRuleList( self )
 			self.__tax_rule_group_list.unpickle_data( fh )
 			self.__configuration_list.unpickle_data( fh )
+			self.__movement_reason_list.unpickle_data( fh )
+			self.__product_location_list.unpickle_data( fh )
 
 			return True
 		except StandardError, error:
@@ -837,6 +879,8 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__tax_rule_list.pickle_data( fh )
 			self.__tax_rule_group_list.pickle_data( fh )
 			self.__configuration_list.pickle_data( fh )
+			self.__movement_reason_list.pickle_data( fh )
+			self.__product_location_list.pickle_data( fh )			
 		finally:
 			fh.close()
 
@@ -851,6 +895,17 @@ class CachedPrestaHelper( PrestaHelper ):
 		e = PrestaProgressEvent( currentStep, maxStep, message )
 		# fire event
 		self.progressCallback( e )
+
+	def product_location_text( self, id ):
+		""" Compute a stock location string from the product id (eg: 91400515) """
+		if is_combination( id ):
+			__id_prod, __id_comb = unmangle_id_product( id )
+			_locations = self.product_locations.locations_from_id_product( __id_prod, __id_comb )
+		else:
+			_locations = self.product_locations.locations_from_id_product( id )
+		if _locations != None:
+			return ", ".join([ l.location for l in _locations ])
+		return ""
 
 	def __update_search_product_qty( self, _list ):
 		""" Browse the _list  and update the quantity for the article
@@ -961,6 +1016,11 @@ class CachedPrestaHelper( PrestaHelper ):
 		return self.__product_list
 
 	@property
+	def product_locations( self ):
+		""" returns the product locations """
+		return self.__product_location_list
+
+	@property
 	def product_suppliers( self ):
 		""" Return the product suppliers """
 		return self.__product_supplier_list
@@ -984,6 +1044,11 @@ class CachedPrestaHelper( PrestaHelper ):
 	def configurations( self ):
 		""" Return the configurations """
 		return self.__configuration_list
+
+	@property
+	def movement_reasons( self ):
+		""" Return the Stock Movement Reasons """
+		return self.__movement_reason_list
 
 class BaseData( object ):
 	""" Base class for data object... having a reference to the helper """
@@ -1564,6 +1629,101 @@ class TaxRuleGroupList( BaseDataList ):
 				return item
 		return None
 
+class MovementReasonData( BaseData ):
+	""" Raison for the stock movement """
+	__slots__ = ["id", "sign", "name" ]
+
+	# Sign is a multiplier: an integer +1 or -1
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the MovementReasonList """
+		pass
+
+	def __getstate__(self):
+		""" return the current state of the object for pickeling """
+		return {'id':self.id, 'name':self.name, 'sign':self.sign }
+
+	def __setstate__(self, dic ):
+		""" set the current state of object from dic parameter """
+		self.id = dic['id']
+		self.sign = dic['sign' ]
+		self.name  = dic['name' ]
+
+	def __repr__( self ):
+		return "<%s %s = %i>" % (self.__class__.__name__, self.name, self.sign )
+
+class MovementData( BaseData ):
+	""" Stock movement data.
+
+		id: unique identifier of stock movement
+		id_stock: (int) identify the Stock_Available record (so also the product ID)
+		id_product: (None) must be resolved from id_stock (see Stock_Availables)
+		reference: ('') product reference must be resolved from id_stock
+
+		qty: (int) quantity of the movement. Positive Integer!
+		sign: (int) +1 or -1, sign of the stock change.
+		id_order: (None) contains the order ID when stock change is related to an order
+
+		id_employee: (int) person who initiates the stock change
+		date_add: (datetime) date and time of the stock change
+
+		id_mvt_reason: (int) see MovementRaesons
+	"""
+	__slots__ = ["id", "id_stock", "id_product", "reference", "qty", "sign", "id_order", "id_employee", "date_add", "id_mvt_reason" ]
+
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the MovementReasonList """
+		pass
+
+class MovementList( BaseDataList ):
+	""" List of Stock Movements """
+
+	def load_from_xml( self, node ):
+		""" Load the Stock Movement list with data comming from prestashop search.
+			Must contains nodes: id, name, value """
+			# [id,id_employee,id_stock,id_stock_mvt_reason,id_order,physical_quantity,sign,date_add]
+		items = etree_to_dict( node )
+		items = items['prestashop']['stock_mvts']['stock_mvt']
+		for item in items:
+			_data = MovementData( self.helper )
+			_data.id      = int( item['id'] )
+			_data.id_employee = int( item['id_employee']['#text'] )
+			_data.id_stock = int( item['id_stock']['#text'] ) # Stock Available
+			if len(item['id_order']['#text'])==0:
+				_data.id_order = None
+			else:
+				_data.id_order = int( item['id_order']['#text'] )
+			_data.sign    = int( item['sign'] )
+			_data.qty     = int( item['physical_quantity'] )
+			#_data.date_add = decode the date    item['date_add']
+
+			_data.id_mvt_reason = int( item['id_stock_mvt_reason']['#text'] )
+			self.append( _data )
+
+class MovementReasonList( BaseDataList ):
+	""" List of Stock Movement Reason """
+
+	def load_from_xml( self, node ):
+		""" Load the Movement reason list with data comming from prestashop search.
+			Must contains nodes: id, name, value """
+		items = etree_to_dict( node )
+		items = items['prestashop']['stock_movement_reasons']['stock_movement_reason']
+		for item in items:
+			_data = MovementReasonData( self.helper )
+			_data.id      = int( item['id'] )
+			_data.name    = extract_hashtext( item['name'] )
+			_data.sign    = int( item['sign'] )
+			self.append( _data )
+
+	def reason_from_id( self, id ):
+		""" Return the ConfigurationData object from Name """
+		for item in self:
+			if item.id == id:
+				return item
+		return None
+
+
 class ConfigurationData( BaseData ):
 	""" Contains the Configuration Information Data """
 	__slots__ = ["id", "name", "value" ]
@@ -2053,6 +2213,27 @@ class CombinationData( BaseData ):
 
 		return canonical_search_string( self.reference )
 
+class ProductLocationData( BaseData ):
+	""" Contains the WareHouse location for a giver Product or Product+Combination """
+	__slots__ = ["id", "id_product", "id_combination", "id_warehouse", "location" ]
+
+	def load_from_xml( self, node ):
+		""" Initialise the data from a combination """
+		pass
+
+	def __getstate__(self):
+		""" return the object state for pickeling """
+		return {"id":self.id, "id_product" : self.id_product, "id_combination" : self.id_combination, "id_warehouse" : self.id_warehouse, "location": self.location }
+
+	def __setstate__(self,dic):
+		""" Set the object state from unpickeling """
+		self.id             = dic['id']
+		self.id_product     = dic['id_product']
+		self.id_combination = dic['id_combination']
+		self.id_warehouse	= dic['id_warehouse']
+		self.location       = dic['location']
+
+
 class ProductData( BaseData ):
 	""" Constains the data of an product.
 
@@ -2335,6 +2516,44 @@ class CombinationList( BaseDataList ):
 
 	def unmangle_id_product( self, computed_id_product ):
 		return unmangle_id_product( computed_id_product )
+
+
+class ProductLocationList( BaseDataList ):
+	""" List of ProductLocation (api/warehouse_product_locations) """
+
+	def load_from_xml( self, node ):
+		#save_to_file('ProductLocation.load_from_xml', node) # Debug
+		items = etree_to_dict( node )
+		#print( items )
+		items = items['prestashop']['warehouse_product_locations']['warehouse_product_location']
+		for item in items:
+			# Sometime, the combination does not contains a valid ID_product
+			if not( '#text' in item['id_product'] ):
+				print( "ProductLocation: record id %s has invalid id_product %s" % (item['id'], item['id_product']) )
+				continue
+			# print( item )
+			_data = ProductLocationData( self.helper )
+			_data.id         = int( item['id'] )
+			_data.id_product = int( item['id_product']['#text'] )
+			_data.id_combination  = int( item['id_product_attribute']['#text'] ) if '#text' in item['id_product_attribute'] else None
+			_data.id_warehouse    = int( item['id_warehouse']['#text'] )
+			_data.location        = item['location']
+			# Only keep track of records with Location
+			if _data.location != None:
+				self.append( _data )
+
+	def locations_from_id_product( self, id_product, id_combination=None ):
+		_list = []
+		for item in self:
+			if item.id_product==id_product:
+				if id_combination==None:
+					_list.append( item )
+				elif item.id_combination==id_combination:
+					_list.append( item )
+		if len( _list )==0:
+			return None
+		return _list
+
 
 def recompute_id_product( id_product, id_combination ):
 	""" Compute an unique product ID named recompute_id_product based on (id_product, id_combination) """

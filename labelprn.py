@@ -318,6 +318,7 @@ def print_ticket_batch( batch, qty ):
 	_exp_ean = calculate_ean13( '326200%s' % batch.data.expiration.replace('/','') )
 	d.ean13( origin=(200,360), ean=unicode( _exp_ean ), height_dots = 20 )
 	d.field( origin=(140,425), font=d.font('E'), data= unicode( 'Lot: %s' % batch.data.batch_id ) )
+	d.field( origin=(350,425), font=d.font('E'), data= unicode( 'Loc: %s' % batch.data.loc ) )
 	# Draw a line
 	d.draw_box( 140, 460, 550, 1 )
 
@@ -335,9 +336,9 @@ def print_ticket_batch( batch, qty ):
 	del( medium )
 
 	for transformation in batch.transformations:
-		print_ticket_transformation( batch.data.batch_id , transformation, qty=transformation.label_count )
+		print_ticket_transformation( batch.data.batch_id , transformation, qty=transformation.label_count, batch_loc=batch.data.loc )
 
-def print_ticket_transformation( batch_id, transformation, qty ):
+def print_ticket_transformation( batch_id, transformation, qty, batch_loc ):
 	""" Print the ticket labels for a batch  """
 	global printer_ticket_queue_name
 	medium = PrinterCupsAdapter( printer_queue_name = printer_ticket_queue_name )
@@ -369,6 +370,7 @@ def print_ticket_transformation( batch_id, transformation, qty ):
 	_exp_ean = calculate_ean13( '326200%s' % transformation.expiration.replace('/','') )
 	d.ean13( origin=(200,360), ean=unicode( _exp_ean ), height_dots = 20 )
 	d.field( origin=(140,425), font=d.font('E'), data= unicode( 'Lot: %s' % batch_id ) )
+	d.field( origin=(350,425), font=d.font('E'), data= unicode( 'Loc: %s' % batch_loc ) )
 	# Draw T
 	d.field( origin=(540,690), font=d.font('E'), data= unicode('T') )
 	d.draw_circle( 540,690, 20, tickness=3 )

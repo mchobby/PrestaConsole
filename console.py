@@ -457,6 +457,7 @@ COMMANDS = [
 	('list order'     , '*' ),
 	('list product'   , '+' ),
 	('list supplier'  , '*' ),
+	('list mvt'       , '*' ),
 	('order'          , '+'  ),
 	('print once'     , 0   ),
 	('print begin'    , 0   ),
@@ -498,6 +499,7 @@ class App( BaseApp ):
 						 'show-product-qm'   : '0',
 						 'show-product-qo'   : '0',
 						 'show-product-ean'  : '0',
+						 'show-product-loc'  : '0',
 						 'inactive-product'  : '0',
 						 'include-it'        : '0',
 						 'label-separator'   : '0',
@@ -673,6 +675,9 @@ class App( BaseApp ):
 		if self.options['show-product-ean'] == '1':
 			sTitle += ' | %15s' % 'EAN'
 			sPrint += ' | %15s'
+		if self.options['show-product-loc'] == '1':
+			sTitle += ' | %-6s' % 'Loc'
+			sPrint += ' | %-6s'
 		sTitle += ' | %-20s' % 'Supp. Ref.'
 		sPrint += ' | %-50s'
 
@@ -737,6 +742,8 @@ class App( BaseApp ):
 				_lst.append( psr.product_data.price_ttc )
 			if self.options['show-product-ean'] == '1':
 				_lst.append( psr.product_data.ean13 )
+			if self.options['show-product-loc'] == '1':
+				_lst.append( self.cachedphelper.product_location_text( psr.product_data.id ) )
 			_lst.append( psr.supplier_refs )
 
 			# Go for display
@@ -1166,6 +1173,8 @@ class App( BaseApp ):
 		if not(_p):
 			self.output.writeln( 'Invalid id product.' )
 			return
+		_loc_text = self.cachedphelper.product_location_text( _id )
+		#print( 'localisation', _loc_text )
 		self.output.writeln( "--- PREPARING NEW BATCH for ID %s ---" % _id )
 		self.output.writeln( "  ref   : %s" % _p.reference )
 		self.output.writeln( "  label : %s" % _p.name )
@@ -1200,12 +1209,13 @@ class App( BaseApp ):
 		batch.data.expiration        = _exp
 		batch.data.label_count       = _label_qty # Number of printeed label
 		batch.data.info 			 = _info
+		batch.data.loc               = _loc_text
 		self.batches.save_batch( batch )
 
 		self.output.writeln( "Batch %i created!" % batch.data.batch_id )
 
 		while True:
-			_confirm = request_text( 'CREATE TRANSFORMATION (y=1/.)? ', default = '0' )
+			_confirm = request_text( 'APPEND TRANSFORMATION (y=1/.)? ', default = '0' )
 			if not( _confirm.upper() in ('1','Y') ):
 				break
 			self.encode_batch_transformation( batch )
@@ -1270,7 +1280,7 @@ class App( BaseApp ):
 		self.batches.save_batch( _batch )
 		self.output.writeln( "Batch %i updated!" % _batch.data.batch_id )
 
-		print_ticket_transformation( _batch.data.batch_id , _trf, qty=_trf.label_count )
+		print_ticket_transformation( _batch.data.batch_id , _trf, qty=_trf.label_count, batch_loc=_batch.data.loc )
 		self.output.writeln( "" )
 
 	def do_batch_print( self, params ):
@@ -1486,6 +1496,15 @@ class App( BaseApp ):
 			self.output.writeln( "%10s : %4s : %3s x %-30s : %10s : %s" % (_batch.data.creation_date.strftime("%d/%m/%Y"), _batch.data.batch_id, _batch.data.label_count ,_batch.data.product_reference, _batch.data.product_id, _batch.data.expiration  ) )
 		self.output.writeln( "" )
 
+	def do_list_mvt( self, params ):
+		""" list the stock movements """
+		last_id = self.cachedphelper.get_laststockmovement_id()
+		self.output.writeln( 'Last stock ID: %i' % last_id )
+
+		mvts = self.cachedphelper.get_stock_movements( from_id=last_id, count=100 )
+		for mvt in mvts:
+			self.output.writeln( "%7i : %4s : %3s" % (mvt.id,'','')  )
+
 	def do_check_stock_config( self, params ):
 		""" Check all the product with improper stock configuration. """
 		psr_lst = ProductSearchResultList()
@@ -1566,7 +1585,10 @@ class App( BaseApp ):
 			self.output.writeln( '' )
 			# Content the order
 			for row in order.rows:
-				self.output.writeln( row )
+				s = '%s' % row
+				if self.options['show-product-loc'] == '1' :
+					s += ' [ %s ] ' % self.cachedphelper.product_location_text( int(row.id_product) ) 
+				self.output.writeln( s )
 
 		def display_tariff():
 			# qty, ref, country, tariff, total weight,  Unit_price Ex.VAT, total_price Ex.VAT
@@ -2061,6 +2083,12 @@ class App( BaseApp ):
 		self.output.writeln( 'S/N status : %s' % ('have SERIAL NUMBER' if ('SN' in _p) and (_p['SN']=='Y') else 'no serial') )
 		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty >= 0 else '---') )
 		self.output.writeln( 'Weight     : %6.3f Kg' % p.weight )
+		
+		# _id  can be composed 311401472
+		_location = self.cachedphelper.product_location_text( _id )
+		if len( _location )>0:
+			self.output.writeln( 'Location   : %s' % _location )
+			self.output.writeln( '' )
 
 		# Supplier Ref
 		_supp_ref = -1
