@@ -1,8 +1,7 @@
-#!/usr/bin/python
 #-*- encoding: utf8 -*-
 """ Configuration management for PrestaConsole and others """
 
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 from os.path import expanduser
 
 CONFIG_FILENAME = 'config.ini'
@@ -176,17 +175,17 @@ class Config(object):
 	@property
 	def shop_info_small( self ):
 		""" Shop information to display on small labels """
-		return [ unicode(item) for item in self._shop_info_small.split( '/n') ]
+		return [ str(item) for item in self._shop_info_small.split( '/n') ]
 
 	@property
 	def shop_info_large( self ):
 		""" Shop information to display on small labels """
-		return [ unicode(item) for item in self._shop_info_large.split( '/n') ]
+		return [ str(item) for item in self._shop_info_large.split( '/n') ]
 
 	@property
 	def shop_info_small( self ):
 		""" Shop information to display on small labels """
-		return [ unicode(item) for item in self._shop_info_small.split( '/n') ]
+		return [ str(item) for item in self._shop_info_small.split( '/n') ]
 
 	@property
 	def logfile( self ):
