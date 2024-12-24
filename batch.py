@@ -186,7 +186,7 @@ class Batch( object ):
 		with codecs.open( filename, 'rb', encoding='utf-8' ) as _file:
 			_lines = _file.readlines()
 			for _line in _lines:
-				r.append( _line.encode('utf8','replace').replace('\r','').replace('\n',''))
+				r.append( _line.replace('\r','').replace('\n',''))
 		return r
 
 class BatchFactory( object ):

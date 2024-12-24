@@ -163,6 +163,12 @@ batch search <KEY> <COUNT=100> :
   Return a list of matching batches.
 
 
+batch expire <nbr_of_month> :
+   Check all the batches with quantities in stock. IF batch expiration 
+   reached current_date-<nbr_of_month> THEN the product appears the list (and
+   display the number of remaining month to the expiration) !
+
+
 check stock config :
 
   List all the product with improper stock configuration.

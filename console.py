@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 """ console.py - prestashop console application
@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 
 from prestaapi import PrestaHelper, CachedPrestaHelper, calculate_ean13, ProductSearchResult, ProductSearchResultList, OrderStateList, recompute_id_product, unmangle_id_product, is_combination
 from output import PrestaOut
-from prestaapi.prestahelpertest import run_prestahelper_tests
+#from prestaapi.prestahelpertest import run_prestahelper_tests
 from config import Config
 from pprint import pprint # Not required
 import logging
@@ -78,7 +78,7 @@ def progressHandler( prestaProgressEvent ):
 
 def request_text( prompt = 'text (+q to quit) ?', default=None ):
 	""" Request a text """
-	value = raw_input( prompt )
+	value = input( prompt )
 	if value == '+q':
 		return None
 	if (value == '') and default:
@@ -117,7 +117,7 @@ def request_expiration( prompt ):
 
 def request_int( prompt = 'How many items ?', confirm_from_value=25 ):
 	""" Request a quantity and confirm it if greater than confirm_from_value """
-	value = raw_input( prompt )
+	value = input( prompt )
 	if value == 0:
 		return None
 	if value == '+q':
@@ -127,7 +127,7 @@ def request_int( prompt = 'How many items ?', confirm_from_value=25 ):
 
 	qty = int( value )
 	if qty > confirm_from_value:
-		value2 = raw_input( 'Quantity > %s! Please confirm: ' % confirm_from_value )
+		value2 = input( 'Quantity > %s! Please confirm: ' % confirm_from_value )
 		if not value2.isdigit():
 			print( '%s is not a numeric value, ABORT!' % value2 )
 			return None
@@ -205,7 +205,7 @@ class BaseApp( object ):
 	def _normalize_keyword( self, sCmd ):
 		""" try to replace each item of a command by it normalized item (otherwise the original value) """
 		_s = sCmd.lower().strip()
-		for key, values in self.KEYWORDS.iteritems():
+		for key, values in self.KEYWORDS.items():
 			if (_s == key) or (_s in values):
 				return key
 		return sCmd
@@ -610,7 +610,7 @@ class App( BaseApp ):
 		else:
 			value1 = '---'
 		# The QM warning value
-		if psr.product_data.unrepeatable_order_qty > 0:
+		if psr.product_data.unrepeatable_order_qty and psr.product_data.unrepeatable_order_qty > 0:
 			value2 = '%s' % (-1*psr.product_data.unrepeatable_order_qty)
 			if psr.qty < 0: # Also append it when we have negative qty in stock
 				value2 += '%+i' % psr.qty
@@ -686,6 +686,7 @@ class App( BaseApp ):
 		self.output.writeln( '-'*len(sTitle))
 		_count = 0
 		for psr in  psr_list : # Returns a list of ProductSearchResult
+
 			# If it isn't a ProductSearchResult, we will have to Mimic it!
 			if isinstance( psr, ProductSearchResult ):
 				pass
@@ -695,66 +696,70 @@ class App( BaseApp ):
 				psr.ordered_qty = _item.qty # set the ordered qty from ToteBag
 
 			# --- prepare the data ---
-			_lst = []
-			# Order QTY come from ToteBag
-			if psr.ordered_qty:
-				_lst.append( psr.ordered_qty )
+			try:
+				_lst = []
+				# Order QTY come from ToteBag
+				if psr.ordered_qty:
+					_lst.append( psr.ordered_qty )
 
-			# ID, Ref, QTY
-			_lst = _lst + [psr.product_data.id, psr.product_data.reference, psr.qty ]
+				# ID, Ref, QTY
+				_lst = _lst + [psr.product_data.id, psr.product_data.reference, psr.qty ]
 
-			# Minimal Quantity
-			if self.options['show-product-qm']=='1':
-				# Get 'Quantity Minimal', 'Quantity Minimal Warning' text
-				QM, sQM_Warning = self.get_qm_info( psr )
-				_lst.append( QM )
-				_lst.append( sQM_Warning )
-				# Attempt to retreive QM
-				#_params = self.get_product_params( psr.product_data.id )
-				#_qm = None
-				#if 'QM' in _params:
-				#	try:
-				#		_qm = int(_params['QM'])
-				#		_lst.append( _qm )
-				#	except:
-				#		_lst.append( '???')
-				#else:
-				#	_lst.append(  '---' )
-				# Display QM warning column
-				#if psr.qty <= 0:
-				#	_lst.append( '%s' % psr.qty )
-				#elif _qm and (psr.qty < _qm):
-				#	_lst.append( '!!!' )
-				#else:
-				#	_lst.append( '' )
-			if self.options['show-product-qo']=='1':
-				QO = self.get_qo_info( psr )
-				_lst.append( QO )
+				# Minimal Quantity
+				if self.options['show-product-qm']=='1':
+					# Get 'Quantity Minimal', 'Quantity Minimal Warning' text
+					QM, sQM_Warning = self.get_qm_info( psr )
+					_lst.append( QM )
+					_lst.append( sQM_Warning )
+					# Attempt to retreive QM
+					#_params = self.get_product_params( psr.product_data.id )
+					#_qm = None
+					#if 'QM' in _params:
+					#	try:
+					#		_qm = int(_params['QM'])
+					#		_lst.append( _qm )
+					#	except:
+					#		_lst.append( '???')
+					#else:
+					#	_lst.append(  '---' )
+					# Display QM warning column
+					#if psr.qty <= 0:
+					#	_lst.append( '%s' % psr.qty )
+					#elif _qm and (psr.qty < _qm):
+					#	_lst.append( '!!!' )
+					#else:
+					#	_lst.append( '' )
+				if self.options['show-product-qo']=='1':
+					QO = self.get_qo_info( psr )
+					_lst.append( QO )
 
-			if self.options['show-product-label'] == '1':
-				_lst.append( psr.product_data.name )
-			if self.options['show-product-pa'] == '1':
-				_lst.append( psr.product_data.wholesale_price )
-			if self.options['show-product-pv'] == '1':
-				_lst.append( psr.product_data.price )
-				vat_rate = self.cachedphelper.get_tax_rate( psr.product_data.id_tax_rules_group, LOCAL_COUNTRY_ISO  )
-				psr.product_data.update_vat_rate( vat_rate )
-				_lst.append( psr.product_data.price_ttc )
-			if self.options['show-product-ean'] == '1':
-				_lst.append( psr.product_data.ean13 )
-			if self.options['show-product-loc'] == '1':
-				_lst.append( self.cachedphelper.product_location_text( psr.product_data.id ) )
-			_lst.append( psr.supplier_refs )
+				if self.options['show-product-label'] == '1':
+					_lst.append( psr.product_data.name )
+				if self.options['show-product-pa'] == '1':
+					_lst.append( psr.product_data.wholesale_price )
+				if self.options['show-product-pv'] == '1':
+					_lst.append( psr.product_data.price )
+					vat_rate = self.cachedphelper.get_tax_rate( psr.product_data.id_tax_rules_group, LOCAL_COUNTRY_ISO  )
+					psr.product_data.update_vat_rate( vat_rate )
+					_lst.append( psr.product_data.price_ttc )
+				if self.options['show-product-ean'] == '1':
+					_lst.append( psr.product_data.ean13 )
+				if self.options['show-product-loc'] == '1':
+					_lst.append( self.cachedphelper.product_location_text( psr.product_data.id ) )
+				_lst.append( psr.supplier_refs )
 
-			# Go for display
-			if psr.remark != None:
-				self.output.writeln( '' )
-				self.output.writeln( '     %s' % psr.remark )
-			self.output.writeln( sPrint % tuple( _lst ) )
-			if psr.remark != None:
-				self.output.writeln( '' )
+				# Go for display
+				if psr.remark != None:
+					self.output.writeln( '' )
+					self.output.writeln( '     %s' % psr.remark )
+				self.output.writeln( sPrint % tuple( _lst ) )
+				if psr.remark != None:
+					self.output.writeln( '' )
 
-			_count += 1
+				_count += 1
+			except:
+				self.output.writeln( f"[ERROR] for product {psr.product_data.reference} ({psr.product_data.id})" )
+				raise
 
 		self.output.writeln( '%s rows in result' % _count )
 
@@ -953,7 +958,7 @@ class App( BaseApp ):
 			if value != None:
 				self.do_bag( params )
 
-			value = raw_input( "Rebate percent or +q: " )
+			value = input( "Rebate percent or +q: " )
 			if value == '+q':
 				break
 
@@ -967,10 +972,10 @@ class App( BaseApp ):
 
 	def do_bag_comment( self, params ):
 		""" Add a comment to the bag """
-		label = raw_input( "Label or +q: " )
+		label = input( "Label or +q: " )
 		if ( label == '+q' ) or ( len(label)==0 ):
 			return None
-		price = raw_input( "price or empty or +q: " )
+		price = input( "price or empty or +q: " )
 		if len(price)==0:
 			_price = None
 		elif price=='+q':
@@ -978,7 +983,7 @@ class App( BaseApp ):
 		else:
 			_price = float( price )
 
-		qty = raw_input( "qty or empty or +q: " )
+		qty = input( "qty or empty or +q: " )
 		if len(qty)==0:
 			_qty = 1
 		elif qty=='+q':
@@ -996,7 +1001,7 @@ class App( BaseApp ):
 			return None
 		for idx in range( len(self.bag.comments) ):
 			self.output.writeln( '%2i : %s' % (idx, self.bag.comments[idx].text ) )
-		value = raw_input( "Which to delete or +q: " )
+		value = input( "Which to delete or +q: " )
 		if len(value)==0:
 			return None
 		elif value=='+q':
@@ -1016,14 +1021,14 @@ class App( BaseApp ):
 
 		pricing  = 0.0
 		qty      = 1
-		shipping = raw_input( "Label or +q: " )
+		shipping = input( "Label or +q: " )
 		if ( shipping == '+q' ) or ( len(shipping)==0 ):
 			return None
 		elif shipping.isdigit():
 			pricing  = _pricing[int(shipping)][1]
 			shipping = _pricing[int(shipping)][0]
 
-		price = raw_input( "price (%6.2f) or +q: " % pricing )
+		price = input( "price (%6.2f) or +q: " % pricing )
 		if len(price)==0:
 			pass # Keep pricing
 		elif price=='+q':
@@ -1031,7 +1036,7 @@ class App( BaseApp ):
 		else:
 			pricing = float( price )
 
-		value = raw_input( "qty (%i) or +q: " % qty )
+		value = input( "qty (%i) or +q: " % qty )
 		if len(value)==0:
 			pass
 		elif value=='+q':
@@ -1372,7 +1377,7 @@ class App( BaseApp ):
 
 		# self.output_product_search_result( psr_list = products )
 		class ExpirationData:
-			__slots__ = ['product_id', 'batch_id', 'batch_obj', 'qty', 'expiration', 'expmonths' 'transfo']
+			__slots__ = ['product_id', 'batch_id', 'batch_obj', 'qty', 'expiration', 'expmonths', 'transfo']
 
 			def __init__( self, product_id, batch_id, batch_obj, qty, expiration, transfo ):
 				self.product_id = product_id
@@ -1842,7 +1847,7 @@ class App( BaseApp ):
 			sorted_lst = sorted( psr_lst, key=lambda item:item.product_data.reference.upper() )
 			# Check if we do need to add a Remark
 			for item in sorted_lst:
-				if item.product_data.unrepeatable_order_qty > 0:
+				if item.product_data.unrepeatable_order_qty and item.product_data.unrepeatable_order_qty > 0:
 					item.remark = '/!\\ %i x UNREPEATABLE ORDER QUANTITY /!\\' % item.product_data.unrepeatable_order_qty
 
 			self.output_product_search_result( psr_list = sorted_lst )
@@ -2081,7 +2086,7 @@ class App( BaseApp ):
 		_p = self.get_product_params( _id )
 		self.output.writeln( 'QM   ( QO ): %2s     ( %2s ) ' % ( _p['QM'] if 'QM' in _p else '---',  _p['QO'] if 'QO' in _p else '---' ) )
 		self.output.writeln( 'S/N status : %s' % ('have SERIAL NUMBER' if ('SN' in _p) and (_p['SN']=='Y') else 'no serial') )
-		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty >= 0 else '---') )
+		self.output.writeln( 'UnrepeatQty: %s' % (p.unrepeatable_order_qty if p.unrepeatable_order_qty and p.unrepeatable_order_qty >= 0 else '---') )
 		self.output.writeln( 'Weight     : %6.3f Kg' % p.weight )
 		
 		# _id  can be composed 311401472
@@ -2258,7 +2263,7 @@ class App( BaseApp ):
 				raise ValueError( '%s is not a valid option' % params[0] )
 		else:
 			# show all params
-			for key_val in self.options.iteritems():
+			for key_val in self.options.items():
 				self.output.writeln( prefix+'%-20s = %s' % key_val )
 
 	def do_show_stat( self, params ):

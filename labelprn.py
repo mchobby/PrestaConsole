@@ -42,7 +42,7 @@ shop_info_large = [] # Shop Information for Large Label
 
 def request_qty( prompt = 'How many items ?'):
 	""" Request a quantity and confirm it if greater than 25 """
-	value = raw_input( prompt )
+	value = input( prompt )
 	if value == 0:
 		return None
 	if value == '+q':
@@ -52,7 +52,7 @@ def request_qty( prompt = 'How many items ?'):
 
 	qty = int( value )
 	if qty > 25:
-		value2 = raw_input( 'Quantity > 25! Please confirm: ' )
+		value2 = input( 'Quantity > 25! Please confirm: ' )
 		if not value2.isdigit():
 			print( '%s is not a numeric value, ABORT!' % value2 )
 			return None
@@ -84,7 +84,7 @@ def handle_print_for_product( product, params, separator=False ):
 
 	while True:
 		print( 'Label format: %s (+ to change)' % label_size.upper() )
-		value = raw_input( 'How many label for %s: ' % product.reference )
+		value = input( 'How many label for %s: ' % product.reference )
 		if len(value)==0:
 			value = '1'
 		if value=='0':
@@ -101,7 +101,7 @@ def handle_print_for_product( product, params, separator=False ):
 			return False
 
 		if int(value) > 25:
-			value2 = raw_input( 'Quantity > 25! Please confirm: ' )
+			value2 = input( 'Quantity > 25! Please confirm: ' )
 			if not value2.isdigit():
 				print( '%s is not a numeric value, ABORT!' % value2 )
 				return False
@@ -111,24 +111,24 @@ def handle_print_for_product( product, params, separator=False ):
 
 		if label_size == 'small':
 			if separator:
-				print_custom_label_small( '='*24, [u'%s x' % value, unicode(product.reference) ], 1 )
+				print_custom_label_small( '='*24, [u'%s x' % value, str(product.reference) ], 1 )
 			# Print a SMALL label on the PRINTER_SHORTLABEL_QUEUE_NAME
 			print_product_label_medium( product.id, product.reference, product.ean13, int(value) )
 			return True
 		else:
 			# Print a LARGE label on the PRINTER_LARGELABEL_QUEUE_NAME
 			if separator:
-				print_custom_label_large(  '='*24, [u'%s x' % value, unicode(product.reference) ], 1 )
+				print_custom_label_large(  '='*24, [u'%s x' % value, str(product.reference) ], 1 )
 		print_product_label_large( product.id, product.reference, product.ean13, int(value) )
 		return True
 
 def handle_print_custom_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
 	lines = []
-	title = 'My onDemand label test!' # Title cannot be unicode
+	title = 'My onDemand label test!' # Title cannot be str
 	_size = 'large'
 
-	title = raw_input( 'Title (sans accent) or +q: ' )
+	title = input( 'Title (sans accent) or +q: ' )
 	if title == '+q': # user abord
 		return
 
@@ -138,14 +138,14 @@ def handle_print_custom_label_large():
 	iLine = 0
 	while True:
 		iLine += 1
-		aLine = raw_input( '%i: ' % iLine )
+		aLine = input( '%i: ' % iLine )
 		if len( aLine ) == 0:
 			break
 		if aLine == '+q': # User abord
 			return
 
-		# Decode the line otherwise the unicode quest an ascii string
-		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		# Decode the line otherwise the str quest an ascii string
+		lines.append( str( aLine.decode( sys.stdin.encoding ) ) )
 		if iLine == 6:
 			break
 
@@ -157,10 +157,10 @@ def handle_print_custom_label_large():
 
 def handle_print_custom_label_king():
 	""" Print King Size Label - 2 lines only """
-	line1 = raw_input( 'Line 1: ' )
+	line1 = input( 'Line 1: ' )
 	if line1 == '+q' or line1 == '':
 		return
-	line2 = raw_input( 'Line 2: ' )
+	line2 = input( 'Line 2: ' )
 	qty = request_qty()
 	if qty == None:
 		return
@@ -170,9 +170,9 @@ def handle_print_custom_label_king():
 def handle_print_custom_label_small():
 	""" Ask the user for the data to print an OnDemand label for short format """
 	lines = []
-	title = 'My onDemand label test!' # Title cannot be unicode
+	title = 'My onDemand label test!' # Title cannot be str
 
-	title = raw_input( 'Title (sans accent) or +q: ' )
+	title = input( 'Title (sans accent) or +q: ' )
 	if title == '+q': # user abord
 		return
 
@@ -180,14 +180,14 @@ def handle_print_custom_label_small():
 	iLine = 0
 	while True:
 		iLine += 1
-		aLine = raw_input( '%i: ' % iLine )
+		aLine = input( '%i: ' % iLine )
 		if len( aLine ) == 0:
 			break
 		if aLine == '+q': # User abord
 			return
 
-		# Decode the line otherwise the unicode quest an ascii string
-		lines.append( unicode( aLine.decode( sys.stdin.encoding ) ) )
+		# Decode the line otherwise the str quest an ascii string
+		lines.append( str( aLine.decode( sys.stdin.encoding ) ) )
 		if iLine == 6:
 			break
 
@@ -204,14 +204,14 @@ def handle_print_warranty_label_large( product ):
 		:param product: the ProductData object to print
 	"""
 	print( "Warranty label                         : %s" % product.reference )
-	prefix_str = raw_input( 'Préfix ou +q (ex:ELI-MEGA)             : ' )
+	prefix_str = input( 'Préfix ou +q (ex:ELI-MEGA)             : ' )
 	if prefix_str == '+q':
 		return
-	counter_start = raw_input( 'N° première étiquette ou +q (ex:150021): ' )
+	counter_start = input( 'N° première étiquette ou +q (ex:150021): ' )
 	if counter_start == '+q':
 		return
 	counter_start = int( counter_start )
-	how_many_label= raw_input( "Combien d'étiquette ou +q              : " )
+	how_many_label= input( "Combien d'étiquette ou +q              : " )
 	if how_many_label == '+q':
 		return
 	how_many_label = int( how_many_label )
@@ -221,9 +221,9 @@ def handle_print_warranty_label_large( product ):
 def handle_print_vat_label_large():
 	""" Ask the user for the data to print an OnDemand label for large format """
 	lines = []
-	title = 'Exempte de TVA Belge' # Title cannot be unicode
+	title = 'Exempte de TVA Belge' # Title cannot be str
 
-	# Decode the line otherwise the unicode quest an ascii string
+	# Decode the line otherwise the str quest an ascii string
 	lines.append( u"Conformément à l'Article 39 bis du Code"  )
 	lines.append( u"de la TVA."  )
 	lines.append( u"Livraison Intracommunautaire de Biens."  )
@@ -237,13 +237,13 @@ def handle_print_vat_label_large():
 
 def handle_print_esd_label_large():
 	""" Ask the user for qty and print Electro Static Discharge labels """
-	title = 'Conformite testee' # Title cannot be unicode
+	title = 'Conformite testee' # Title cannot be str
 	lines = []
 	lines.append( u"Cet article a ete controle"  )
 	lines.append( u"par MC Hobby SPRL"  )
 
 	# print_custom_label_king( "/!\\  DECHARGES  /!\\", "ELECTROSTATIQUES", qty=1 )
-	# Decode the line otherwise the unicode quest an ascii string
+	# Decode the line otherwise the str quest an ascii string
 
 	qty = request_qty()
 	if qty == None:
@@ -256,8 +256,8 @@ def handle_print_esd_label_large():
 
 def handle_print_conformity_label_small():
 	""" Ask user for quantity then print the conformity labels """
-		# Decode the line otherwise the unicode quest an ascii string
-	title = 'CONFORMITE TESTEE' # Title cannot be unicode
+		# Decode the line otherwise the str quest an ascii string
+	title = 'CONFORMITE TESTEE' # Title cannot be str
 	lines = [ u'Cet article a ete controle', u'par MC Hobby SPRL' ]
 
 	qty = request_qty()
@@ -268,13 +268,13 @@ def handle_print_conformity_label_small():
 
 def handle_print_ean_label_large():
 	""" Ask the user for the data to print a CUSTOM ean label for large format """
-	title = raw_input( 'Title (sans accent) or +q: ' )
+	title = input( 'Title (sans accent) or +q: ' )
 	if title == '+q': # user abord
 		return
-	label = raw_input( 'Label (sans accent) or +q: ' )
+	label = input( 'Label (sans accent) or +q: ' )
 	if label == '+q': # user abord
 		return
-	ean = raw_input( 'EAN (sans accent) or +q: ' )
+	ean = input( 'EAN (sans accent) or +q: ' )
 	if ean == '+q': # user abord
 		return
 
@@ -302,23 +302,23 @@ def print_ticket_batch( batch, qty ):
 	if qty > 1:
 		d.print_quantity( qty )
 	_ref = batch.data.product_reference
-	d.field( origin=(120,40 ), font=d.font('G'), data= unicode( _ref[:13] ) )
-	d.field( origin=(120,100), font=d.font('G'), data= unicode( _ref[13:] ) )
+	d.field( origin=(120,40 ), font=d.font('G'), data= str( _ref[:13] ) )
+	d.field( origin=(120,100), font=d.font('G'), data= str( _ref[13:] ) )
 
-	#d.field( origin=(140,10), font=d.font('E'), data= unicode( batch.data.product_reference ) )
-	d.field( origin=(120,160), font=d.font('B'), data= unicode( batch.data.product_name ) )
+	#d.field( origin=(140,10), font=d.font('E'), data= str( batch.data.product_reference ) )
+	d.field( origin=(120,160), font=d.font('B'), data= str( batch.data.product_name ) )
 
 	# Write a BarCode field
-	d.ean13( origin=(200,185), ean=unicode( batch.data.product_ean), height_dots = 50 )
+	d.ean13( origin=(200,185), ean=str( batch.data.product_ean), height_dots = 50 )
 
 	#Expiration: 05/2020
-	d.field( origin=(140,290), font=d.font('E'), data= unicode( 'Expire:') )
-	d.field( origin=(280,280), font=d.font('G'), data= unicode( batch.data.expiration ) )
+	d.field( origin=(140,290), font=d.font('E'), data= str( 'Expire:') )
+	d.field( origin=(280,280), font=d.font('G'), data= str( batch.data.expiration ) )
 	# Write a BarCode field
 	_exp_ean = calculate_ean13( '326200%s' % batch.data.expiration.replace('/','') )
-	d.ean13( origin=(200,360), ean=unicode( _exp_ean ), height_dots = 20 )
-	d.field( origin=(140,425), font=d.font('E'), data= unicode( 'Lot: %s' % batch.data.batch_id ) )
-	d.field( origin=(350,425), font=d.font('E'), data= unicode( 'Loc: %s' % batch.data.loc ) )
+	d.ean13( origin=(200,360), ean=str( _exp_ean ), height_dots = 20 )
+	d.field( origin=(140,425), font=d.font('E'), data= str( 'Lot: %s' % batch.data.batch_id ) )
+	d.field( origin=(350,425), font=d.font('E'), data= str( 'Loc: %s' % batch.data.loc ) )
 	# Draw a line
 	d.draw_box( 140, 460, 550, 1 )
 
@@ -354,25 +354,25 @@ def print_ticket_transformation( batch_id, transformation, qty, batch_loc ):
 	if qty > 1:
 		d.print_quantity( qty )
 	_ref = transformation.target_product_reference
-	d.field( origin=(120,40 ), font=d.font('G'), data= unicode( _ref[:13] ) )
-	d.field( origin=(120,100), font=d.font('G'), data= unicode( _ref[13:] ) )
+	d.field( origin=(120,40 ), font=d.font('G'), data= str( _ref[:13] ) )
+	d.field( origin=(120,100), font=d.font('G'), data= str( _ref[13:] ) )
 
-	#d.field( origin=(140,10), font=d.font('E'), data= unicode( batch.data.product_reference ) )
-	d.field( origin=(120,160), font=d.font('B'), data= unicode( transformation.target_product_name ) )
+	#d.field( origin=(140,10), font=d.font('E'), data= str( batch.data.product_reference ) )
+	d.field( origin=(120,160), font=d.font('B'), data= str( transformation.target_product_name ) )
 
 	# Write a BarCode field
-	d.ean13( origin=(200,185), ean=unicode( transformation.target_product_ean), height_dots = 50 )
+	d.ean13( origin=(200,185), ean=str( transformation.target_product_ean), height_dots = 50 )
 
 	#Expiration: 05/2020
-	d.field( origin=(140,290), font=d.font('E'), data= unicode( 'Expire:') )
-	d.field( origin=(280,280), font=d.font('G'), data= unicode( transformation.expiration ) )
+	d.field( origin=(140,290), font=d.font('E'), data= str( 'Expire:') )
+	d.field( origin=(280,280), font=d.font('G'), data= str( transformation.expiration ) )
 	# Write a BarCode field
 	_exp_ean = calculate_ean13( '326200%s' % transformation.expiration.replace('/','') )
-	d.ean13( origin=(200,360), ean=unicode( _exp_ean ), height_dots = 20 )
-	d.field( origin=(140,425), font=d.font('E'), data= unicode( 'Lot: %s' % batch_id ) )
-	d.field( origin=(350,425), font=d.font('E'), data= unicode( 'Loc: %s' % batch_loc ) )
+	d.ean13( origin=(200,360), ean=str( _exp_ean ), height_dots = 20 )
+	d.field( origin=(140,425), font=d.font('E'), data= str( 'Lot: %s' % batch_id ) )
+	d.field( origin=(350,425), font=d.font('E'), data= str( 'Loc: %s' % batch_loc ) )
 	# Draw T
-	d.field( origin=(540,690), font=d.font('E'), data= unicode('T') )
+	d.field( origin=(540,690), font=d.font('E'), data= str('T') )
 	d.draw_circle( 540,690, 20, tickness=3 )
 	# Draw a line
 	d.draw_box( 140, 460, 550, 1 )
@@ -409,7 +409,7 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 
 	# Start a Print format
 	d.format_start()
-	d.field( origin=(120,11), font=d.font('E'), data= unicode( 'This is a test' ) )
+	d.field( origin=(120,11), font=d.font('E'), data= str( 'This is a test' ) )
 
 	# Set Quantity
 	if qty > 1:
@@ -440,19 +440,19 @@ def print_product_label( product_id, product_ref, product_ean, qty ):
 			l2 = product_ref.ljust(20)[10:]
 
 
-	d.field( origin=(120,11), font=d.font('E'), data= unicode( l1 ) )
-	d.field( origin=(120,42), font=d.font('E'), data= unicode( l2 ) )
+	d.field( origin=(120,11), font=d.font('E'), data= str( l1 ) )
+	d.field( origin=(120,42), font=d.font('E'), data= str( l2 ) )
 	# Write a BarCode field
-	d.ean13( origin=(130,80), ean=unicode(product_ean), height_dots = 50 )
+	d.ean13( origin=(130,80), ean=str(product_ean), height_dots = 50 )
 
 	global shop_info_small
 	if shop_info_small: # A list of string
 		for i in range( len(shop_info_small)):
-			d.field( origin=(98,(160+i*25)), font=d.font('C'), data=unicode( shop_info_small[i] ) )
+			d.field( origin=(98,(160+i*25)), font=d.font('C'), data=str( shop_info_small[i] ) )
 	#d.field( origin=(130,160), font=d.font('C'), data=u'shop.mchobby.be' )
 	#d.field( origin=(98,185), font=d.font('C'), data=u'MC Hobby sprl' )
 
-	d.field( origin=(265,185), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	d.field( origin=(265,185), font=d.font('E',17,8), data=str( product_id ).rjust(4) )
 	# End Print format
 	d.format_end()
 
@@ -486,19 +486,19 @@ def print_product_label_medium( product_id, product_ref, product_ean, qty ):
 	if qty > 1:
 		d.print_quantity( qty )
 
-	d.field( origin=(25,15), font=d.font('E'), data= unicode( product_ref ) )
+	d.field( origin=(25,15), font=d.font('E'), data= str( product_ref ) )
 
 	# Write a BarCode field
-	d.ean13( origin=(210,60), ean=unicode(product_ean), height_dots = 50 )
+	d.ean13( origin=(210,60), ean=str(product_ean), height_dots = 50 )
 
 	global shop_info_large
 	if shop_info_small: # A list of string
 		for i in range( len(shop_info_large)):
-			d.field( origin=(35,(140+i*25)), font=d.font('C'), data=unicode( shop_info_large[i] ) )
+			d.field( origin=(35,(140+i*25)), font=d.font('C'), data=str( shop_info_large[i] ) )
 	#d.field( origin=(35,140), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
 	#d.field( origin=(80,165), font=d.font('C'), data=u'Happy Electronic Hacking!' )
 
-	d.field( origin=(325,187), font=d.font('E',17,8), data=unicode( product_id ).rjust(4) )
+	d.field( origin=(325,187), font=d.font('E',17,8), data=str( product_id ).rjust(4) )
 	# End Print format
 	d.format_end()
 
@@ -533,15 +533,15 @@ def print_product_label_large( product_id, product_ref, product_ean, qty ):
 		d.print_quantity( qty )
 
 	# Write a BarCode field
-	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode( product_ref) ) # use font E as default
+	d.field( origin=(175,11), font=d.font('T',17,8), data= str( product_ref) ) # use font E as default
 
-	d.ean13( origin=(500,62), ean=unicode(product_ean), height_dots = 50 )
-	d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+	d.ean13( origin=(500,62), ean=str(product_ean), height_dots = 50 )
+	d.field( origin=(630,160), font=d.font('T',17,8), data=str( product_id ).rjust(4) ) # use font E by default
 
 	global shop_info_large
 	if shop_info_large: # A list of string
 		for i in range( len(shop_info_large)):
-			d.field( origin=(225,(150+i*25)), font=d.font('C'), data=unicode( shop_info_large[i] ) )
+			d.field( origin=(225,(150+i*25)), font=d.font('C'), data=str( shop_info_large[i] ) )
 	#d.field( origin=(225,150), font=d.font('C'), data=u'MC Hobby sprl - shop.mchobby.be' )
 	#d.field( origin=(255,175), font=d.font('C'), data=u'Happy Electronic Hacking!' )
 
@@ -580,14 +580,14 @@ def print_label_large( title, label, ean, qty=1 ):
 		d.print_quantity( qty )
 
 	# Write a BarCode field
-	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode(title) ) # use font E as default
+	d.field( origin=(175,11), font=d.font('T',17,8), data= str(title) ) # use font E as default
 
-	#d.ean13( origin=(500,62), ean=unicode(ean), height_dots = 50 )
-	d.ean13( origin=(320,62), ean=unicode(ean), height_dots = 80 )
+	#d.ean13( origin=(500,62), ean=str(ean), height_dots = 50 )
+	d.ean13( origin=(320,62), ean=str(ean), height_dots = 80 )
 
-	#d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+	#d.field( origin=(630,160), font=d.font('T',17,8), data=str( product_id ).rjust(4) ) # use font E by default
 
-	d.field( origin=(225,175), font=d.font('C'), data=unicode( label ) )
+	d.field( origin=(225,175), font=d.font('C'), data=str( label ) )
 
 	# End Print format
 	d.format_end()
@@ -617,18 +617,18 @@ def print_warranty_label_large( product, prefix_text, counter_start, label_count
 		d.format_start()
 
 		# Write a BarCode field
-		d.field( origin=(175,11), font=d.font('S',17,8), data= unicode( 'Garantie/Warranty') ) # use font E as default
-		d.field( origin=(175,62), font=d.font('T',17,8), data= unicode( '%s-%i' % (prefix_text, counter_start + label_counter) ) )# use font E as default
+		d.field( origin=(175,11), font=d.font('S',17,8), data= str( 'Garantie/Warranty') ) # use font E as default
+		d.field( origin=(175,62), font=d.font('T',17,8), data= str( '%s-%i' % (prefix_text, counter_start + label_counter) ) )# use font E as default
 
 		war_ean = "325%09d" % (counter_start + label_counter,)  #EAN12: 325<ID_warranty>
-		d.ean13( origin=(500,11), ean=unicode(calculate_ean13(war_ean)), height_dots = 20 )
-		# d.field( origin=(630,160), font=d.font('T',17,8), data=unicode( product_id ).rjust(4) ) # use font E by default
+		d.ean13( origin=(500,11), ean=str(calculate_ean13(war_ean)), height_dots = 20 )
+		# d.field( origin=(630,160), font=d.font('T',17,8), data=str( product_id ).rjust(4) ) # use font E by default
 
 		d.field( origin=(175,120), font=d.font('C'), data=u'Pour vos garanties, voir les conditions' )
 		d.field( origin=(175,145), font=d.font('C'), data=u'générales de ventes sur shop.mchobby.be' )
 
-		d.field( origin=(400,170), font=d.font('S',17,8), data=unicode(str(product.reference)) )
-		d.ean13( origin=(175,165), ean=unicode(product.ean13), height_dots = 20 )
+		d.field( origin=(400,170), font=d.font('S',17,8), data=str(str(product.reference)) )
+		d.ean13( origin=(175,165), ean=str(product.ean13), height_dots = 20 )
 
 		# End Print format
 		d.format_end()
@@ -651,7 +651,7 @@ def print_custom_label_large( label_title, label_lines, qty ):
 	""" Print the Labels on the GK420t on 70mm width x 2.5mm height labels
 
 	label_title: title on the label, first line in extra bold
-	label_lines: list of unicode to be printed (up to 5 lines)"""
+	label_lines: list of str to be printed (up to 5 lines)"""
 	#print product_id
 	#print product_ref
 	#print product_ean
@@ -668,7 +668,7 @@ def print_custom_label_large( label_title, label_lines, qty ):
 		d.print_quantity( qty )
 
 	# Write a BarCode field
-	d.field( origin=(175,11), font=d.font('T',17,8), data= unicode(label_title) ) # use font E as default
+	d.field( origin=(175,11), font=d.font('T',17,8), data= str(label_title) ) # use font E as default
 	top = 62
 	for line in label_lines:
 		d.field( origin=(175, top), font=d.font('C'), data=line )
@@ -704,9 +704,9 @@ def print_custom_label_king( label_title, label_title2, qty=1 ):
 	# Set Quantity
 	if qty > 1:
 		d.print_quantity( qty )
-	d.field( origin=(125,11), font=d.font('V',80,71), data= unicode(label_title) )
+	d.field( origin=(125,11), font=d.font('V',80,71), data= str(label_title) )
 	if len( label_title2 )>0:
-		d.field( origin=(125,11+80), font=d.font('V',80,71), data= unicode(label_title2) )
+		d.field( origin=(125,11+80), font=d.font('V',80,71), data= str(label_title2) )
 
 	#top = 62
 	#for line in label_lines:
@@ -734,7 +734,7 @@ def print_custom_label_small( label_title, label_lines, qty, ean=None ):
 	""" Print the Labels on the LP2824 on small labels
 
 	label_title: title on the label, lines 1 & two in extra bold
-	label_lines: list of unicode to be printed (up to 5 lines)
+	label_lines: list of str to be printed (up to 5 lines)
 	ean        : ean12 or ean13 (as string) to print. ean12 is automatically transformed to ean13! """
 	#print product_id
 	#print product_ref
@@ -753,8 +753,8 @@ def print_custom_label_small( label_title, label_lines, qty, ean=None ):
 
 	# Write a BarCode field
 	#   Change d.font('E') to d.font('T',17,8 )
-	d.field( origin=(40,11), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[:24] ) )
-	d.field( origin=(40,45), font=d.font('T',17,8), data= unicode( label_title.ljust(20)[24:] ) )
+	d.field( origin=(40,11), font=d.font('T',17,8), data= str( label_title.ljust(20)[:24] ) )
+	d.field( origin=(40,45), font=d.font('T',17,8), data= str( label_title.ljust(20)[24:] ) )
 	top = 95
 	for line in label_lines:
 		d.field( origin=(40, top), font=d.font('C'), data=line )
@@ -764,7 +764,7 @@ def print_custom_label_small( label_title, label_lines, qty, ean=None ):
 	if ean:
 		if len(ean)!=13:
 			ean = calculate_ean13(ean) # Transform ean12 to ean13 --> append check digit
-		d.ean13( origin=(120,140), ean=unicode(ean), height_dots = 50 )
+		d.ean13( origin=(120,140), ean=str(ean), height_dots = 50 )
 
 	# End Print format
 	d.format_end()
@@ -785,9 +785,9 @@ def print_custom_label_small( label_title, label_lines, qty, ean=None ):
 
 def ean12_to_ean13():
 	""" calculate the checksum of an ean12 to create an ean13 """
-	value = raw_input( 'Ean12: ' )
+	value = input( 'Ean12: ' )
 	if not( value.isdigit() ) or not ( len(value)== 12 ):
-		print 'EAN12 must have 12 digits!'
+		print( 'EAN12 must have 12 digits!' )
 		return
 	print( 'Ean13: %s' % calculate_ean13( value ) )
 
@@ -812,15 +812,15 @@ def ean12_to_ean13():
 def print_vat_labels():
 	""" Ask the user for the data to print an OnDemand label for large format """
 	lines = []
-	title = 'Exempte de TVA Belge' # Title cannot be unicode
+	title = 'Exempte de TVA Belge' # Title cannot be str
 
-	# Decode the line otherwise the unicode quest an ascii string
+	# Decode the line otherwise the str quest an ascii string
 	lines.append( u"Conformément à l'Article 39 bis du Code"  )
 	lines.append( u"de la TVA."  )
 	lines.append( u"Livraison Intracommunautaire de Biens."  )
 	lines.append( u"Autoliquidation."  )
 
-	value = raw_input( 'How many labels ?' )
+	value = input( 'How many labels ?' )
 	if value == 0:
 		return
 	if value == '': # By default, 1 label

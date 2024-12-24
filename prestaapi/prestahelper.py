@@ -16,8 +16,10 @@ import logging
 import pickle
 import os.path
 from datetime import datetime
+from functools import reduce
 
 PRESTA_UNDEFINE_INT = -1
+
 
 def save_to_file( base_name, el ):
 	""" Helper: Save the readable version of the element tree for easy debugging.
@@ -34,11 +36,11 @@ def etree_to_dict(t):
     if children:
         dd = defaultdict(list)
         for dc in map(etree_to_dict, children):
-            for k, v in dc.iteritems():
+            for k, v in dc.items():
                 dd[k].append(v)
-        d = {t.tag: {k:v[0] if len(v) == 1 else v for k, v in dd.iteritems()}}
+        d = {t.tag: {k:v[0] if len(v) == 1 else v for k, v in dd.items()}}
     if t.attrib:
-        d[t.tag].update(('@' + k, v) for k, v in t.attrib.iteritems())
+        d[t.tag].update(('@' + k, v) for k, v in t.attrib.items())
     if t.text:
         text = t.text.strip()
         if children or t.attrib:
@@ -69,12 +71,12 @@ def extract_hashtext( item, default_lang_id='2' ):
 		for label_dic in item['language']:
 			if label_dic['@id'] == default_lang_id:
 				if '#text' in label_dic: # cover strange case: {'language': {'@id': '2'}
-					return label_dic['#text'].encode('UTF8')
+					return label_dic['#text'] # .encode('UTF8')
 				else:
 					return ''
 	else:
 		if '#text' in item['language']:
-			return item['language']['#text'].encode('UTF8')
+			return item['language']['#text'] #.encode('UTF8')
 		else:
 			return ''
 
@@ -243,6 +245,22 @@ class PrestaHelper(object):
 		customer = CustomerData( self )
 		customer.load_from_xml( el )
 		return customer
+
+	def get_address( self, id ):
+		""" Retreive the Address from the id
+
+		:param id: address id (int) to retreive the address information
+
+		Returns:
+		An address object
+		"""
+		if not( isinstance( id, int )):
+			raise ValueError( 'id must be integer' )
+		logging.debug( 'read id_address: %s ' % id )
+		el = self.__prestashop.get( 'addresses', id )
+		address = AddressData( self )
+		address.load_from_xml( el )
+		return address
 
 	def get_product_at_data( self, id_product, default_lang_id=2 ):
 		""" Extract the extra @DATA information hidden inside the product description.
@@ -478,6 +496,28 @@ class PrestaHelper(object):
 		item = etree_to_dict( el )
 		return int( item['prestashop']['orders']['order']['@id'] )
 
+	def get_customer_order_ids( self, id_customer, limit = 5 ):
+		""" Retreive a list of Order ID stored in prestashop for a given id_customer. Start from the highest ID in the database with
+					a max of limit rows loaded via the API"""		
+		el = self.__prestashop.search( 'orders', options={'limit':limit, 'sort' : 'id_DESC', 'display':'[id,id_customer]', 'filter[id_customer]': '[%i]' % id_customer } )			
+		items = etree_to_dict( el )
+
+		#print( items )
+		# Si aucune entrée due au filtrage (oui cela arrive)
+		if isinstance( items['prestashop']['orders'], str ):
+		  return []
+
+		# Si une seule entrée --> transformer l'unique dictionnaire en liste
+		order_list = items['prestashop']['orders']['order']
+		if isinstance( order_list, dict ):
+			order_list = [ order_list ]
+
+		#print( order_list )
+		_result = []
+		for order in order_list:
+			_result.append( int(order['id']) )
+		return _result
+
 	def get_order_ids( self, order_state_filter, limit = 25 ):
 		""" Retreive a list of Order ID stored in prestashop for a given
 			status. Start from the highest ID in the database with
@@ -523,7 +563,7 @@ class PrestaHelper(object):
 		try:
 			for i in range( count ): #  range(1)=0 range(2)=0,1
 				el = self.__prestashop.get( 'orders', fromId-i )
-				# print( ElementTree.tostring( el ) )
+				#print( ElementTree.tostring( el ) )
 				order = OrderData( self )
 				order.load_from_xml( el )
 				_result.append( order )
@@ -852,7 +892,7 @@ class CachedPrestaHelper( PrestaHelper ):
 			self.__product_location_list.unpickle_data( fh )
 
 			return True
-		except StandardError, error:
+		except Exception as error:
 			 logging.error( 'Reload cache from %s failed due to exception' % self.CACHE_FILE_NAME )
 			 logging.exception( error )
 			 return False
@@ -1066,6 +1106,14 @@ class BaseData( object ):
 		"""
 		pass
 
+	@property
+	def as_text( self ):
+		_val = []
+		for fieldname in self.__slots__:
+			_val.append( getattr(self,fieldname) )
+
+		return ', '.join( ['%s=%s' % (key,val) for key,val in zip( self.__slots__, _val ) ] )
+
 
 class BaseDataList( list ):
 	""" Base class to register list of BaseData object """
@@ -1212,7 +1260,7 @@ class OrderData( BaseData ):
 
 	This class is supposed to extend with time """
 
-	__slots__ = ["id", "id_customer", "id_carrier", "current_state", "valid", "payment", "total_paid_tax_excl", "total_paid", "shipping_number", "id_shop", "id_lang", "date_add", "date_upd", "rows"]
+	__slots__ = ["id", "id_customer", "id_carrier", "current_state", "valid", "payment", "total_paid_tax_excl", "total_paid", "shipping_number", "id_shop", "id_address_delivery", "id_address_invoice", "id_lang", "date_add", "date_upd", "rows"]
 
 	def load_from_xml( self, node ):
 		""" Initialise the data of an Order """
@@ -1236,6 +1284,8 @@ class OrderData( BaseData ):
 		else:
 			self.shipping_number = ''
 		self.id_shop			 = int( order['id_shop'] )
+		self.id_address_delivery = int( order['id_address_delivery']['#text'] )
+		self.id_address_invoice  = int( order['id_address_invoice']['#text'] )
 		self.id_lang			 = int( order['id_lang']['#text'] )
 		self.rows				 = []
 		_rows = order['associations']['order_rows']['order_row']
@@ -1478,6 +1528,76 @@ class CountryList( BaseDataList ):
 			if item.iso_code == iso_code:
 				return item
 		return None
+
+
+class AddressData( BaseData ):
+	""" Contains the Address Data """
+	OWNER_CUSTOMER     = 0 # from id_customer otherwise '0'
+	OWNER_MANUFACTURER = 1 # from id_manufacturer otherwise '0'
+	OWNER_SUPPLIER     = 2 # from id_supplier otherwise '0'
+	OWNER_WAREHOUSE    = 3 # from id_warehouse otherwise '0'
+	#
+	# not captured: id_state, dni, deleted, date_add, date_upd
+	#
+	# vat_number maybe None
+	# company maybe None
+	__slots__ = ["id","id_owner","owner_type", "alias", "id_country", "company", "lastname", "firstname", "vat_number", 
+				"address1", "address2", "postcode", "city", "other", "phone", "phone_mobile" ]
+
+
+	def load_from_xml( self, node ):
+		""" properties initialized directly from the TaxList """
+		items = etree_to_dict( node )
+		# print( items )
+		item = items['prestashop']['address']
+		self.id      = int( item['id'] )
+		# presently, we only load Customer Address 
+		self.id_owner  = int( item['id_customer']['#text'] )
+		self.owner_type = self.OWNER_CUSTOMER
+		self.alias = item['alias']
+		self.id_country = int(item['id_country']['#text'])
+		self.company = item['company']
+		if self.company != None:
+			if len( self.company.strip() )==0:
+				self.company = None
+		self.lastname = item['lastname'] if item['lastname'] != None else ''
+		self.firstname = item['firstname'] if item['firstname'] != None else ''
+		self.vat_number = item['vat_number']
+		if self.vat_number != None:
+			if len( self.vat_number.strip() )==0:
+				self.vat_number = None
+		self.address1 = item['address1'] if item['address1'] != None else ''
+		self.address2 = item['address2'] if item['address2'] != None else ''
+		self.postcode = item['postcode'] if item['postcode'] != None else ''
+		self.city = item['city'] if item['city'] != None else ''
+		self.other = item['other'] if  item['alias'] != None else ''
+		self.phone = item['phone'] if  item['phone'] != None else ''
+		self.phone_mobile = item['phone_mobile'] if item['phone_mobile'] != None else ''
+		"""
+
+			'id_customer': {'@{http://www.w3.org/1999/xlink}href': 'https://shop.mchobby.be/api/customers/44982', '#text': '44982'}, 
+			'id_manufacturer': '0', 
+			'id_supplier': '0', 
+			'id_warehouse': '0', 
+			'id_country': {'@{http://www.w3.org/1999/xlink}href': 'https://shop.mchobby.be/api/countries/8', '#text': '8'}, 
+			'id_state': '0', 
+			'alias': 'PRIVE', 
+			'company': None, 
+			'lastname': 'Liberge', 
+			'firstname': 'Marc', 
+			'vat_number': None, 
+			'address1': '1 Porzh An Pantier', 
+			'address2': None, 
+			'postcode': '22390', 
+			'city': 'BOURBRIAC', 
+			'other': 'Point Mondial Relay : FR-022583', 
+			'phone': '+33668110632', 
+			'phone_mobile': None, 
+			'dni': None, 
+			'deleted': '0', 
+			'date_add': '2024-11-29 19:33:11', 
+			'date_upd': '2024-11-29 19:33:11'}}}
+		"""
 
 class TaxData( BaseData ):
 	""" Contains the Tax Data """
@@ -2321,7 +2441,7 @@ class ProductData( BaseData ):
 	@property
 	def is_IT( self ):
 		""" Check if the product is an [IT] product """
-		return '[IT]' in self.name
+		return "[IT]" in self.name
 
 	@property
 	def is_INTERNAL( self ):
@@ -2598,6 +2718,7 @@ class BaseProductList( BaseDataList ):
 			_data.advanced_stock_management = int( item['advanced_stock_management'] )
 			_data.name     = extract_hashtext( item['name'] ) # ['language']['#text']
 			_data.reference= item['reference']
+			# print( "reference", type(item['reference']) )
 			if _data.reference==None:
 				print( "BaseProductList: Product ID %i has no reference!" % _data.id )
 			_data.wholesale_price = float( item['wholesale_price'] )
